@@ -1,7 +1,10 @@
 #!/bin/bash
 # This utility script takes turns __main__.py into a single executable python file containing all dependencies
 ##### Zip up __main__.py first (into studiocontroller.pyz)
-outputFileName="studiocontroller.pyz"
+# Specify the script where main() (the entry point of the program where main() lives)
+# zipapp will create an output file with this name and a .pyz file extension
+zipappMainScript="studiocontroller"
+
 # Declare dependencies as an array
 dependencies=(
 	requests==2.24.0
@@ -10,7 +13,7 @@ dependencies=(
 # Temporary folder where pip will collect the dependencies. The name of this folder will determine the name of the file executable archive
 targetSubFolder="tempDownloadsFolder"
 
-echo "Creating $outputFileName executable archive file"
+echo "Creating $zipappMainScript.pyz executable archive file"
 # echo ${dependencies[@]}
 
 echo "Use proxy www-cache.reith.bbc.co.uk:80?"
@@ -30,7 +33,7 @@ echo 'Copying __main__.py (main program code) and *.py files into target subfold
 cp *.py $targetSubFolder
 
 echo "Creating $targetSubFolder.pyz file from contents of $targetSubFolder" 
-python3 -m zipapp $targetSubFolder -c -p "/usr/bin/env python" -o $outputFileName
+python3 -m zipapp $targetSubFolder -c -p "/usr/bin/env python" -m "$zipappMainScript:main" -o "$zipappMainScript.pyz"
 
  echo "Deleting $targetSubFolder subfolder (as no longer required)"
  rm -rf $targetSubFolder

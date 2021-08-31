@@ -1,8 +1,13 @@
+# Bash script to package the current *.py scripts into a sengle *.pyz executable
+# and then push to the (current) remote git repo
+# It optionally takes a remote commuit label as an argument
+# James Turner 31/8/21
+
 # Create a single folder executable (run existing script)
 ./createSingleFileExecutable
 
-# git commit chamges with a default name (Windows test....")
-git commit -am "Commit changes to remote"
+# git commit changes with a default label (Windows test....") if noe supplied, or else the supplied label
+git commit -am ${1:-"Commit changes to remote"}
 
 # push to remote repo
 git push
