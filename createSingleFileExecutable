@@ -8,6 +8,7 @@ zipappMainScript="studiocontroller"
 # Declare dependencies as an array
 dependencies=(
 	requests==2.24.0
+	terminaltables==3.1.0
 	)
 
 # Temporary folder where pip will collect the dependencies. The name of this folder will determine the name of the file executable archive
