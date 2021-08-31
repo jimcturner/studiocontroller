@@ -1,0 +1,36 @@
+#!/bin/bash
+# This utility script takes turns __main__.py into a single executable python file containing all dependencies
+##### Zip up __main__.py first (into studiocontroller.pyz)
+outputFileName="studiocontroller.pyz"
+# Declare dependencies as an array
+dependencies=(
+	requests==2.24.0
+	)
+
+# Temporary folder where pip will collect the dependencies. The name of this folder will determine the name of the file executable archive
+targetSubFolder="tempDownloadsFolder"
+
+echo "Creating $outputFileName executable archive file"
+# echo ${dependencies[@]}
+
+echo "Use proxy www-cache.reith.bbc.co.uk:80?"
+read answer
+if [ "$answer" != "${answer#[Yy]}" ] ;then
+	python3 -m pip --proxy www-cache.reith.bbc.co.uk:80 install  "${dependencies[@]}" --target $targetSubFolder
+else
+    python3 -m pip install  "${dependencies[@]}" --target $targetSubFolder
+fi
+
+
+echo "downloading dependancies into new subfolder $targetSubFolder"
+# python3 -m pip --proxy www-cache.reith.bbc.co.uk:80 install  ${dependencies[@]} --target $targetSubFolder
+# python3 -m pip install  ${dependencies[@]} --target $targetSubFolder
+
+echo 'Copying __main__.py (main program code) and *.py files into target subfolder $targetSubFolder for parcelling up with dependencies'
+cp *.py $targetSubFolder
+
+echo "Creating $targetSubFolder.pyz file from contents of $targetSubFolder" 
+python3 -m zipapp $targetSubFolder -c -p "/usr/bin/env python" -o $outputFileName
+
+ echo "Deleting $targetSubFolder subfolder (as no longer required)"
+ rm -rf $targetSubFolder
