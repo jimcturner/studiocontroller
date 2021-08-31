@@ -8,7 +8,8 @@
 ./createSingleFileExecutable
 
 # Extract the supplied first argument (if supplied) to be used as a commit label
-commitLabel='"'${1:-"Commit changes to remote"}'"'
+#commitLabel='"'${1:-"Commit changes to remote"}'"'
+commitLabel=${1:-"Commit changes to remote"}
 echo "Using $commitLabel"
 # git commit changes with a default label (Windows test....") if none supplied, or else the supplied label
 git commit -am "$commitLabel"
