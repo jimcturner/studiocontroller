@@ -14,4 +14,4 @@ echo "Using $commitLabel"
 git commit -am "$commitLabel"
 
 # push to remote repo
-#git push
+git push
