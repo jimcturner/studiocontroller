@@ -621,7 +621,7 @@ class HttpServerCreator(object):
     # The RequestHandler can access the parent class methods using 'self.server.parentObject' from within the
     # handler itself
     def __init__(self, listenPort, requestHandler, listenAddr=None, serverName=None, externalResourcesDict=None,
-                 overrideParentObject=None):
+                 overrideParentObject=None, loggingMethod=None):
         self.listenPort = listenPort
         self.requestHandler = requestHandler
         self.listenAddr = listenAddr
@@ -640,6 +640,12 @@ class HttpServerCreator(object):
                 self.httpd.setParentObjectInstance(self)
             else:
                 self.httpd.setParentObjectInstance(overrideParentObject)
+
+            # If a callback method has been specified for logging purposes, pass a reference to the Http Server
+            # (this will be in turn accessible from HTTPRequestHandlerRTP.log_error(), if it is specified here)
+            if loggingMethod is not None:
+                self.httpd.setLoggingMethod(loggingMethod)
+
             # Start the server as a thread (otherwise __init__() would block
             self.httpdServerThread = threading.Thread(target=self.httpd.serve_forever, daemon=False,
                                                       name=serverName)

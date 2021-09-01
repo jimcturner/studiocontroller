@@ -15,9 +15,55 @@ from validator_collection import validators, checkers, errors
 import textwrap
 from terminaltables import AsciiTable
 
-# Custom Exception used to trigger a shutdown
+
+from HTTPServerSuite import HttpServerCreator, HTTPRequestHandlerRTP
+
+# Custom Exception used to trigger/detect a shutdown request (via SIGINT or SIGKILL)
 class Shutdown(Exception):
     pass
+
+class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
+    def apiGETEndpoints(self):
+        try:
+            getMappings = {}
+            self.addEndpoint(getMappings, "", self.renderIndexPage, contentType='text/html')
+            return getMappings
+        except Exception as e:
+            raise Exception(f"apiGETEndpoints(), {e}")
+
+    def apiPOSTEndpoints(self):
+        # Access parent object via server attribute
+        parent = self.server.parentObject
+        try:
+            postMappings = {}
+            # Sample POST endpoints inherited from isptest code. Left here by way of an example
+            # self.addEndpoint(postMappings, "log", self.addMessageToLog, requiredKeys=["message"], optionalKeys=["logToDisk"])
+            # self.addEndpoint(postMappings, "alert", self.alertUser, requiredKeys=["title", "body"])
+            return postMappings
+        except Exception as e:
+            raise Exception(f"apiPOSTEndpoints() {e}")
+
+
+    def apiDELETEEndpoints(self):
+        # Access parent object via server attribute
+        parent = self.server.parentObject
+        try:
+            deleteMappings = {}
+        except Exception as e:
+            raise Exception(f"apiDELETEEndpoints() {e}")
+        return deleteMappings
+
+    def renderIndexPage(self):
+        # Access parent object via server attribute
+        parent = self.server.parentObject
+        try:
+            body = f"<h1>Index page for studiocontroller (@{parent.listenAddr}:{parent.listenPort})</h1>"\
+                           f"{self.listEndpoints()}"
+            response = self.htmlWrap(title=f"Index page for studiocontroller (@{parent.listenAddr}:{parent.listenPort})",
+                                     body=body)
+            return response
+        except Exception as e:
+            raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}")
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
@@ -173,7 +219,7 @@ def main():
     # Specify the version number of this script
     thisVersion = "1.0"
     # Specify the defaault HTTP Server listen port
-    httpServerDefaultPort=10000
+    httpServerDefaultPort = 10000
 
     #### Check for minimum python version
     if (testPythonVersion(3, 8)):
@@ -324,7 +370,8 @@ Arguments supplied: {argv}
     signal.signal(signal.SIGINT, sigintHandler)  # Ctrl-C (keyboard interrupt)
     signal.signal(signal.SIGTERM, sigtermHandler)  # KILL
 
-
+    # Create a dict of shared object to be shared between all the threads
+    sharedObjects = {}
 
     # # Attempt to import an external data file from within the pyz zipped archive
     # Or, if that fails, just get the file from the file system in the usual way
@@ -348,24 +395,52 @@ Arguments supplied: {argv}
 
     # Start a web server
     print(f"start web server using: {httpServerAddr}")
+    try:
+        # Create a web server
+        httpServer = HttpServerCreator(httpServerAddr[1], PublicHTTPRequestHandler,
+                                              listenAddr=httpServerAddr[0],
+                                              serverName=f"PublicHTTP({httpServerAddr[1]})",
+                                              externalResourcesDict=sharedObjects,
+                                                loggingMethod=logToFile)
+        logToFile(f"Public HTTP server started on {httpServerAddr[0]}:{httpServerAddr[1]}")
+        # Update sharedObjects dict with the HTTP Server address
+        sharedObjects["httpServerAddr"] = httpServerAddr
+    except Exception as e:
+        logToFile("Failed to start public HTTP Server")
 
 
+    # Provides a clean shutdown of all threads
+    def shutdown():
+        try:
+            # Stop the HTTP server
+            try:
+                logToFile("Stopping HTTP server")
+                httpServer.stopServing()
+            except Exception as e:
+                raise Exception(f"ERR: Failed to stop privateHTTP {e}")
+        except Exception as e:
+            logToFile(f"shutdown() {e}")
 
+    # Endless loop - until a shutdown Exception is raised or some other error occurs
     while True:
         try:
             print(".")
             time.sleep(1)
         except Shutdown as e:
-            shutdownText = f"shutting down {e}"
-            print(shutdownText)
-            logToFile(shutdownText)
+            logToFile(f"shutting down {e}")
             break
         except Exception as e:
-            errorText = f"Fatal error, shutting down: {e}"
-            print(errorText)
-            logToFile(errorText)
+            logToFile(f"Fatal error, shutting down: {e}")
             break
-    print("studiocontroller exited successfully")
+    try:
+        shutdown()
+        logToFile("studiocontroller exited successfully")
+        exit(0)
+    except Exception as e:
+        logToFile(f"ERR: Shutdown error {e}")
+        exit(1)
+
+
 
 
 
