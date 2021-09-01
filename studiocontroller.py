@@ -6,6 +6,7 @@
 import datetime
 import os
 import signal
+import socket
 import sys
 import time
 import zipfile
@@ -152,9 +153,27 @@ def sigtermHandler(signum, frame):
     except Exception as e:
         raise Shutdown(e)
 
+# Returns the IP address of the network interface currently used as the default route to the internet (if no args supplied)
+# Alternatively, for a supplied destination ip address, it will return ip address of the interface that, according to the OS
+# routing table will be used to send from.
+def get_ip(ipAddrToTest = '10.255.255.255'):
+    # Lifted from here https://stackoverflow.com/questions/166506/finding-local-ip-addresses-using-pythons-stdlib
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't even have to be reachable
+        s.connect((ipAddrToTest, 1))
+        IP = s.getsockname()[0]
+    except:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 def main():
     # Specify the version number of this script
     thisVersion = "1.0"
+    # Specify the defaault HTTP Server listen port
+    httpServerDefaultPort=10000
 
     #### Check for minimum python version
     if (testPythonVersion(3, 8)):
@@ -166,6 +185,16 @@ def main():
         exit(1)
 
     #### Python version validated, so now parse the command line arguments
+
+    # -c specifies the confog file containing the button/script definitions
+    configFileName = None
+
+    # Specify the default ip address and port that the public HTTP server will listen on
+    # This is a tuple of IP address and TCP port
+    # If the IP address is None, the OS will determine the listen address
+    # If no network cards are available, localhost will be used
+    httpServerAddr = (get_ip(), httpServerDefaultPort)
+
     # Placeholder for the switches/args passed to this script
     argv = None
 
@@ -179,7 +208,15 @@ def main():
             f"corresponding Mikrotik scripts that should be run when they are pressed", columnMaxWidth))]
     ]
     # Specify any optional switches
-    optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help"))]]
+    optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help"))],
+                        ["-p", "--public-http", '\n'.join(textwrap.wrap(f"Specifies a user selected ip address:port "
+                                                                        f"combination, or just a port that the HTTP "
+                                                                        f"server will listen on. By default, the web "
+                                                                        f"server will listen on "
+                                                                        f"{httpServerAddr[0]}:"
+                                                                        f"{httpServerAddr[1]}. "
+                                                                        f"Examples are: -p 192.168.3.50:10000 or "
+                                                                        f"-p 10000. Port values need to be > 1024"))]]
 
     # Create an ascii table of mandatory switches that will be displayed as part of the help page
     table = AsciiTable(mandatorySwitches)
@@ -199,8 +236,6 @@ def main():
     # Create a long options list of strings (from the second column of switches[] that can be passed to getopt
     # Note the '=' suffix (denotes to getopt that this switch will be followed by a value)
     getoptLongOptions = [f"{str(x[1]).replace('--', '')}=" for x in mandatorySwitches + optionalSwitches]
-
-    configFileName = None
 
     helpText = textwrap.dedent(f'''\
 TL/DR This is a Python script to run Mikrotik scripts via a user friendly web gui
@@ -238,6 +273,46 @@ Arguments supplied: {argv}
                         configFileName = arg
                     else:
                         raise Exception(f"Supplied config-file doesn't exist: ({arg}).")
+
+                if opt in ("-p", "--public-http"):
+                    # Set a user-specified public HTTP port or address:port combination
+                    # check for two parameters separated by a colon
+                    if len(arg.split(':')) == 2:
+                        ipAddr = str(arg.split(':')[0])
+                        ipPort = int(arg.split(':')[1])
+                        # Validate supplied IP address
+                        try:
+                            # Validate supplied IP address
+                            try:
+                                validators.ip_address(ipAddr)
+                            except (errors.EmptyValueError, errors.InvalidIPAddressError) as e:
+                                raise Exception(f"ip address {e}")
+                            # Validate supplied port no
+                            try:
+                                validators.integer(int(ipPort), minimum=1024, maximum=65535)
+                            except Exception as e:
+                                raise Exception(f"tcp port {e}")
+                            # ipAddr and ipPort validated so capture the values
+                            httpServerAddr = (ipAddr, int(ipPort))
+
+                        except Exception as e:
+                            raise Exception(
+                                f"-p Invalid Public HTTP server address:port combination supplied: [{arg}], {e}")
+                    else:
+                        # Only a port no supplied, use the previously OS-determined IP address
+                        try:
+                            # Validate supplied port no
+                            try:
+                                validators.integer(int(arg), minimum=1024, maximum=65535)
+                            except Exception as e:
+                                raise Exception(f"tcp port {e}")
+                            # port no validated, so capture and reassign to httpServerAddr tuple
+                            # Note(1), tuple elements can't be modified once assigned
+                            # Note(2) the OS assigned address was established the top of main()
+                            httpServerAddr = (httpServerAddr[0], int(arg))
+                        except Exception as e:
+                            raise Exception(f"-p Invalid Public HTTP port supplied [{arg}], {e}")
+                    print(f"User specified Public HTTP server listen addr: {httpServerAddr[0]}:{httpServerAddr[1]}")
     except Exception as e:
         print(f"Error parsing args: {e}. \nUse -h or --help for help")
         exit(1)
@@ -251,23 +326,30 @@ Arguments supplied: {argv}
 
 
 
-    # Attempt to import an external data file from within the pyz zipped archive
-    fileToImport = "index.html"
-    try:
-        print(f"Importing {fileToImport}")
-        print(f"Extracted file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
+    # # Attempt to import an external data file from within the pyz zipped archive
+    # Or, if that fails, just get the file from the file system in the usual way
+    # fileToImport = "index.html"
+    # try:
+    #     print(f"Importing {fileToImport}")
+    #     print(f"Extracted file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
+    #
+    # except Exception as e:
+    #     pass
+    #     print(f"couldn't extract {fileToImport} from {sys.argv[0]}, {type(e)}:{e}, trying to import as a normal file")
+    #     try:
+    #         f = importFile(fileToImport)
+    #         print(f"Normal import:{f}, {type(f)}")
+    #     except Exception as e2:
+    #         pass
+    #         print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e2}")
 
-    except Exception as e:
-        pass
-        print(f"couldn't extract {fileToImport} from {sys.argv[0]}, {type(e)}:{e}, trying to import as a normal file")
-        try:
-            f = importFile(fileToImport)
-            print(f"Normal import:{f}, {type(f)}")
-        except Exception as e2:
-            pass
-            print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e2}")
+    print("studiocontroller starting....")
+    logToFile("studiocontroller starting....")
 
-    print("Waiting....")
+    # Start a web server
+    print(f"start web server using: {httpServerAddr}")
+
+
 
     while True:
         try:
