@@ -203,12 +203,9 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
     # See here: https://stackoverflow.com/a/3389505
     def log_error(self, format, *args):
         try:
-            # Access parent HTTP Server controllerTCPPort and controllerIPAddress variables
+            # Access parent HTTP Server logging method (optionally specified when the HTTP Server was created)
             # Note: This might not have actually been set. If not, fail silently
-            parent = self.server.parentObject
-            parent.postMessage(
-                f"ERR: HTTPRequestHandlerRTP({self.client_address}).log_error() {format % args}",
-                logToDisk=False)
+            self.server.parentLogger(f"ERR: HTTPRequestHandlerRTP({self.client_address}).log_error() {format % args}")
         except:
             # Fail silently
             pass
@@ -602,6 +599,12 @@ class CustomHTTPServer(ThreadingHTTPServer):
     # constructor method of HTTPServer
     def setParentObjectInstance(self, parentObjectInstance):
         self.parentObject = parentObjectInstance
+
+    # Provides a means for instantiator of the CustomHTTPServer to specify a callback method that can be used
+    # to provide message logging. If provided, this method will be called within the
+    # HTTPRequestHandlerRTP.logError() methof (which itself overrides that of ThreadingHTTPServer.log_error())
+    def setLoggingMethod(self, loggerMethod):
+        self.parentLogger = loggerMethod
 
 
 # Creates a threaded HTTP Server with a single call (involes Utils.CustomHTTPServer)
