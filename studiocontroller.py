@@ -3,12 +3,20 @@
 
 # A python script to provide a simple HTTP UI to remote control a studio Mikrotik router
 # James Turner 2021
+import datetime
+import os
+import signal
 import sys
+import time
 import zipfile
 import getopt
 from validator_collection import validators, checkers, errors
 import textwrap
 from terminaltables import AsciiTable
+
+# Custom Exception used to trigger a shutdown
+class Shutdown(Exception):
+    pass
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
@@ -44,7 +52,14 @@ def testPythonVersion(majorVersionNo, minorVersionNumber):
         # Else Installed Python version satisfies minimum requirements
         return True
 
-def retrieveFileFromArchive(archiveName, filepath, returnAsBytes=False, returnAsLines=False):
+# Extracts a file from a zip archive
+# Based on an answer here: https://stackoverflow.com/a/62604682
+# Allows non-python files incorporated into the zipapp .pyz archive to be extracted at run-time
+# If returnAsBytes==True, the imported file will be returned as a bytestring
+# elif returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
+# else (default) the imported file will be returned as a UTF8 string
+# Ascii can be returned if the function is called with returnStringType='ascii'
+def retrieveFileFromArchive(archiveName, filepath, returnAsBytes=False, returnAsLines=False, returnStringType='utf-8'):
     try:
         with zipfile.ZipFile(archiveName) as zf:
             with zf.open(filepath) as f:
@@ -53,14 +68,89 @@ def retrieveFileFromArchive(archiveName, filepath, returnAsBytes=False, returnAs
                     return f.read()
                 elif returnAsLines:
                     # Return as a list of lines
-                    return f.read().decode('utf-8').splitlines()
+                    return f.read().decode(returnStringType).splitlines()
                 else:
                     # Return as a contiguous string (containing newlines)
-                    return f.read().decode('utf-8')
+                    return f.read().decode(returnStringType)
+    except Exception as e:
+        raise Exception(f"retrieveFileFromArchive() couldn't import {filepath} from {archiveName}, {type(e)}:{e}")
 
+# Utility method to import a file from disk
+# if returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
+# else (default) the imported file will be returned as a UTF8 string
+def importFile(filepath, returnAsLines=False):
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            if returnAsLines:
+                # Return as a list of lines
+                return f.read().splitlines()
+            else:
+                # Return as a bytes object (return the imported file, untouched)
+                return f.read()
 
     except Exception as e:
-        print(f"retrieveFileFromArchive() couldn't import {filepath} from {archiveName}, {type(e)}:{e}")
+        raise Exception(f"importFile() {e}")
+
+# Function to monitor the existing log file size to if they've reached the threshold. If so, rename them
+# to a new file with a date added to the filename. The file extension will be preserved
+# Returns True is archival occurred (i.e source file was larger than the threshold), False if not, or
+# raises an Exception on error
+def archiveLogs(file, maxSize):
+    # Determine size of existing log file
+    # check to see if the file exists at all
+    if os.path.isfile(file):
+        # File does exist, so check the size
+        try:
+            if os.path.getsize(file) > maxSize:
+                # separate the filename and the extension
+                nameNoExtension, fileExtension = os.path.splitext(file)
+                # File is larger than the max threshold so rename it
+                archivedFilenameSuffix = "_ending_at_" + datetime.datetime.now().strftime("%d-%m-%y_%H-%M-%S")
+                os.rename(file, nameNoExtension+archivedFilenameSuffix+fileExtension)
+                # Message.addMessage("Auto archived " + file)
+                return True
+            else:
+                return False
+        except Exception as e:
+            # Message.addMessage("ERR:Utils.archiveLogs() " + str(e))
+            raise Exception("archiveLogs() " + str(e))
+            # return None
+    else:
+        return None
+
+
+# Appends logMessage to logfileName
+# If the log file gets larger than logfileMaxSize_MB, it will be automatically archived
+def logToFile(logMessage, logfileName="studiocontroller_log.txt", logfileMaxSize_MB=1):
+    try:
+        print(logMessage)
+        # Check the filesize before writing. If too large, archive it
+        archiveLogs(logfileName, (logfileMaxSize_MB * 1024 * 1024))
+        # Open file for appending (using 'with' means that the OS will take care of closing it)
+        with open(logfileName, "a+") as fh:
+            # Append logMessage to the file
+            fh.write(f"{datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')}: {logMessage}\n")
+    except Exception as e:
+        # If writing to disk fails, write to stderr instead
+        try:
+            sys.stderr.write(f"ERR:isptestlauncher.logToFile(): {logfileName}, "
+                             f"{datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')}, {logMessage}\n")
+        except:
+            # Fail silently
+            pass
+
+# Define signal handler functions
+def sigintHandler(signum, frame):
+    try:
+        raise Exception("SIGINT")
+    except Exception as e:
+        raise Shutdown(e)
+
+def sigtermHandler(signum, frame):
+    try:
+        raise Exception("SIGKILL")
+    except Exception as e:
+        raise Shutdown(e)
 
 def main():
     # Specify the version number of this script
@@ -152,26 +242,51 @@ Arguments supplied: {argv}
         print(f"Error parsing args: {e}. \nUse -h or --help for help")
         exit(1)
 
+    ####### Main code starts
+    # # Create a threading.Event object that will be monitored by all threads NOTE USED YET
+    # shutdownFlag = threading.Event
+    # Register signal handlers
+    signal.signal(signal.SIGINT, sigintHandler)  # Ctrl-C (keyboard interrupt)
+    signal.signal(signal.SIGTERM, sigtermHandler)  # KILL
+
 
 
     # Attempt to import an external data file from within the pyz zipped archive
     fileToImport = "index.html"
     try:
-
         print(f"Importing {fileToImport}")
-        print(f"Imported file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
+        print(f"Extracted file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
 
     except Exception as e:
-        print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e}")
+        pass
+        print(f"couldn't extract {fileToImport} from {sys.argv[0]}, {type(e)}:{e}, trying to import as a normal file")
+        try:
+            f = importFile(fileToImport)
+            print(f"Normal import:{f}, {type(f)}")
+        except Exception as e2:
+            pass
+            print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e2}")
+
+    print("Waiting....")
+
+    while True:
+        try:
+            print(".")
+            time.sleep(1)
+        except Shutdown as e:
+            shutdownText = f"shutting down {e}"
+            print(shutdownText)
+            logToFile(shutdownText)
+            break
+        except Exception as e:
+            errorText = f"Fatal error, shutting down: {e}"
+            print(errorText)
+            logToFile(errorText)
+            break
+    print("studiocontroller exited successfully")
 
 
 
-
-    print ("DONE!!!!")
-
-
-
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main()
 
