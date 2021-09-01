@@ -44,12 +44,30 @@ def testPythonVersion(majorVersionNo, minorVersionNumber):
         # Else Installed Python version satisfies minimum requirements
         return True
 
+def retrieveFileFromArchive(archiveName, filepath, returnAsBytes=False, returnAsLines=False):
+    try:
+        with zipfile.ZipFile(archiveName) as zf:
+            with zf.open(filepath) as f:
+                if returnAsBytes:
+                    # Return as a bytes object (return the imported file, untouched)
+                    return f.read()
+                elif returnAsLines:
+                    # Return as a list of lines
+                    return f.read().decode('utf-8').splitlines()
+                else:
+                    # Return as a contiguous string (containing newlines)
+                    return f.read().decode('utf-8')
+
+
+    except Exception as e:
+        print(f"retrieveFileFromArchive() couldn't import {filepath} from {archiveName}, {type(e)}:{e}")
+
 def main():
     # Specify the version number of this script
     thisVersion = "1.0"
 
     #### Check for minimum python version
-    if (testPythonVersion(3, 7)):
+    if (testPythonVersion(3, 8)):
         # Python version check passed
         pass
 
@@ -134,17 +152,21 @@ Arguments supplied: {argv}
         print(f"Error parsing args: {e}. \nUse -h or --help for help")
         exit(1)
 
+
+
     # Attempt to import an external data file from within the pyz zipped archive
     fileToImport = "index.html"
     try:
 
         print(f"Importing {fileToImport}")
-        with zipfile.ZipFile(sys.argv[0]) as zf:
-            with zf.open(fileToImport) as f:
-                print(f.read())
+        print(f"Imported file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
 
     except Exception as e:
         print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e}")
+
+
+
+
     print ("DONE!!!!")
 
 
