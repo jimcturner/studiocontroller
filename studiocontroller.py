@@ -4,14 +4,13 @@
 # A python script to provide a simple HTTP UI to remote control a studio Mikrotik router
 # James Turner 2021
 import sys
+import zipfile
 import getopt
-
-# Tests the current Python interpreter version
+from validator_collection import validators, checkers, errors
 import textwrap
-
 from terminaltables import AsciiTable
 
-
+# Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
     # If the major and minor version number is not satisfied
     # i.e the installed version is < than majorVersionNo.minorVersionNumber (eg 3.6) it will
@@ -46,10 +45,11 @@ def testPythonVersion(majorVersionNo, minorVersionNumber):
         return True
 
 def main():
+    # Specify the version number of this script
     thisVersion = "1.0"
-    print(f"Supplied Arguments: {sys.argv}")
+
     #### Check for minimum python version
-    if (testPythonVersion(3, 9)):
+    if (testPythonVersion(3, 7)):
         # Python version check passed
         pass
 
@@ -57,83 +57,96 @@ def main():
         # Python version not satisfied so exit
         exit(1)
 
-    #### Now parse the command line arguments
-        # Placeholder for the switches/args passed to this script
-        argv = None
+    #### Python version validated, so now parse the command line arguments
+    # Placeholder for the switches/args passed to this script
+    argv = None
 
-        # Create a dummy table in order to just get the max width of the *third* column (val will be used to wrap the text)
-        columnMaxWidth = AsciiTable([["x:", "python-interpreter-path= ", "z"]]).column_max_width(2)
+    # Create a dummy table in order to just get the max width of the *third* column (val will be used to wrap the text)
+    columnMaxWidth = AsciiTable([["x:", "python-interpreter-path= ", "z"]]).column_max_width(2)
 
-        # Specify the mandatory switches/long options that can (or should be) passed. Helptext will be used
-        mandatorySwitches = [
-            ["-c", "--config-file", '\n'.join(textwrap.wrap(
-                f"The config file containing the mappings between the web gui buttons and the"
-                f"corresponding Mikrotik scripts that should be run when they are pressed", columnMaxWidth))]
-        ]
-        # Specify any optional switches
-        optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help"))]]
+    # Specify the mandatory switches/long options that can (or should be) passed. Helptext will be used
+    mandatorySwitches = [
+        ["-c", "--config-file", '\n'.join(textwrap.wrap(
+            f"The config file containing the mappings between the web gui buttons and the "
+            f"corresponding Mikrotik scripts that should be run when they are pressed", columnMaxWidth))]
+    ]
+    # Specify any optional switches
+    optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help"))]]
 
-        # Create an ascii table of mandatory switches that will be displayed as part of the help page
-        table = AsciiTable(mandatorySwitches)
-        table.title = "Mandatory args"
-        table.inner_heading_row_border = False
-        mandatorySwitchesFormattedAsTable = table.table
+    # Create an ascii table of mandatory switches that will be displayed as part of the help page
+    table = AsciiTable(mandatorySwitches)
+    table.title = "Mandatory args"
+    table.inner_heading_row_border = False
+    mandatorySwitchesFormattedAsTable = table.table
 
-        # Create an ascii table of optional switches that will be displayed as part of the help page
-        table = AsciiTable(optionalSwitches)
-        table.title = "Optional args"
-        table.inner_heading_row_border = False
-        optionalSwitchesFormattedAsTable = table.table
+    # Create an ascii table of optional switches that will be displayed as part of the help page
+    table = AsciiTable(optionalSwitches)
+    table.title = "Optional args"
+    table.inner_heading_row_border = False
+    optionalSwitchesFormattedAsTable = table.table
 
-        # Create an option string (from the first column of switches[] that can be passed to getopt
-        # Note the ':' suffix (denotes to getopt that this switch will be followed by a value)
-        getoptSwitches = "".join([f"{str(x[0]).replace('-', '')}:" for x in mandatorySwitches + optionalSwitches])
-        # Create a long options list of strings (from the second column of switches[] that can be passed to getopt
-        # Note the '=' suffix (denotes to getopt that this switch will be followed by a value)
-        getoptLongOptions = [f"{str(x[1]).replace('--', '')}=" for x in mandatorySwitches + optionalSwitches]
+    # Create an option string (from the first column of switches[] that can be passed to getopt
+    # Note the ':' suffix (denotes to getopt that this switch will be followed by a value)
+    getoptSwitches = "".join([f"{str(x[0]).replace('-', '')}:" for x in mandatorySwitches + optionalSwitches])
+    # Create a long options list of strings (from the second column of switches[] that can be passed to getopt
+    # Note the '=' suffix (denotes to getopt that this switch will be followed by a value)
+    getoptLongOptions = [f"{str(x[1]).replace('--', '')}=" for x in mandatorySwitches + optionalSwitches]
 
-        configFileName = None
+    configFileName = None
 
-        helpText = textwrap.dedent(f'''\
-        TL/DR This is a  Python script to generate the necessary bash scripts to install 
-        the isptest application on a Raspberry Pi (or similar Linux distro)
+    helpText = textwrap.dedent(f'''\
+TL/DR This is a Python script to run Mikrotik scripts via a user friendly web gui
 
-        This is version v{thisVersion}
+This is version v{thisVersion}
 
-        Arguments supplied: {argv}
+Arguments supplied: {argv}
 
-        {mandatorySwitchesFormattedAsTable}
+{mandatorySwitchesFormattedAsTable}
 
-        {optionalSwitchesFormattedAsTable}
-            ''')
+{optionalSwitchesFormattedAsTable}
+        ''')
 
-        try:
-            # Get the command line args but strip off the first element as it only contains the name of this script
-            argv = sys.argv[1:]
-            if len(argv) == 0:
-                print(f"ERR: ** No parameters supplied **\n\n"
-                      f"{helpText}")
-                exit(1)
+    try:
+        # Get the command line args (note: the first element as it only contains the name of this script)
+        if len(sys.argv) < 1:
+            print(f"ERR: ** No parameters supplied **\n\n"
+                  f"{helpText}")
+            exit(1)
 
-            else:
-                # Special case (display help)
-                if argv[0] == '-h' or argv[0] == '--help':
-                    print(helpText)
-                    exit(0)
+        else:
+            # Special case (display help)
+            if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+                print(helpText)
+                exit(0)
 
-                print(f"Supplied args: {argv}")
-                # Parse the switches (and long parameters)
-                opts, args = getopt.getopt(argv, getoptSwitches, getoptLongOptions)
+            print(f"Supplied args: {sys.argv[1:]}")
+            # Parse the switches (and long parameters)
+            opts, args = getopt.getopt(sys.argv[1:], getoptSwitches, getoptLongOptions)
 
-                # iterate over all supplied options
-                for opt, arg in opts:
-                    if opt in ("-c", "--config-file"):
-                        if checkers.is_on_filesystem(arg):
-                            configFileName = arg
-                        else:
-                            raise Exception(f"Supplied config-file doesn't exist: ({arg}).")
-        except Exception as e:
-            ##### GOT HERE
+            # iterate over all supplied options
+            for opt, arg in opts:
+                if opt in ("-c", "--config-file"):
+                    if checkers.is_on_filesystem(arg):
+                        configFileName = arg
+                    else:
+                        raise Exception(f"Supplied config-file doesn't exist: ({arg}).")
+    except Exception as e:
+        print(f"Error parsing args: {e}. \nUse -h or --help for help")
+        exit(1)
+
+    # Attempt to import an external data file from within the pyz zipped archive
+    fileToImport = "index.html"
+    try:
+
+        print(f"Importing {fileToImport}")
+        with zipfile.ZipFile(sys.argv[0]) as zf:
+            with zf.open('res/resource1.txt') as f:
+                print(f.read())
+
+    except Exception as e:
+        print(f"couldn't import {fileToImport}, {e}")
+    print ("DONE!!!!")
+
 
 
 # Press the green button in the gutter to run the script.
