@@ -140,11 +140,11 @@ Arguments supplied: {argv}
 
         print(f"Importing {fileToImport}")
         with zipfile.ZipFile(sys.argv[0]) as zf:
-            with zf.open('res/resource1.txt') as f:
+            with zf.open(fileToImport) as f:
                 print(f.read())
 
     except Exception as e:
-        print(f"couldn't import {fileToImport}, {e}")
+        print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e}")
     print ("DONE!!!!")
 
 
