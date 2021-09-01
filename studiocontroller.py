@@ -27,6 +27,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         try:
             getMappings = {}
             self.addEndpoint(getMappings, "", self.renderIndexPage, contentType='text/html')
+            self.addEndpoint(getMappings, "api", self.renderApiIndexPage, contentType='text/html')
             return getMappings
         except Exception as e:
             raise Exception(f"apiGETEndpoints(), {e}")
@@ -53,17 +54,27 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             raise Exception(f"apiDELETEEndpoints() {e}")
         return deleteMappings
 
-    def renderIndexPage(self):
+    def renderApiIndexPage(self):
         # Access parent object via server attribute
         parent = self.server.parentObject
         try:
-            body = f"<h1>Index page for studiocontroller (@{parent.listenAddr}:{parent.listenPort})</h1>"\
+            body = f"<h1>Index page for studiocontroller API (@{parent.listenAddr}:{parent.listenPort})</h1>"\
                            f"{self.listEndpoints()}"
-            response = self.htmlWrap(title=f"Index page for studiocontroller (@{parent.listenAddr}:{parent.listenPort})",
+            response = self.htmlWrap(title=f"Index page for studiocontroller API (@{parent.listenAddr}:{parent.listenPort})",
                                      body=body)
             return response
         except Exception as e:
             raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}")
+
+    def renderIndexPage(self):
+        # Access parent object via server attribute
+        parent = self.server.parentObject
+        try:
+            # Attempt to import the index.html page
+            return importFile("index.html", archiveName=parent.externalResourcesDict["pyzArchiveName"])
+        except Exception as e:
+            raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}")
+
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
@@ -125,7 +136,7 @@ def retrieveFileFromArchive(archiveName, filepath, returnAsBytes=False, returnAs
 # Utility method to import a file from disk
 # if returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
 # else (default) the imported file will be returned as a UTF8 string
-def importFile(filepath, returnAsLines=False):
+def importFileFromDisk(filepath, returnAsLines=False):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             if returnAsLines:
@@ -135,6 +146,35 @@ def importFile(filepath, returnAsLines=False):
                 # Return as a bytes object (return the imported file, untouched)
                 return f.read()
 
+    except Exception as e:
+        raise Exception(f"importFileFromDisk() {e}")
+
+# This is a wrapper for retrieveFileFromArchive() and importFileFromDisk()
+# It's purpose is to retrieve a requested file either from the file system, or (if archiveName is not None),
+# from a zipped archive (which is expected to be an executable Python archive created by zipapp)
+# (i.e. archiveName is the name of a zip archive (or path) that *does* exist in the filesystem
+# WHY BOTHER:
+#   The distribution version of studiocontroller will be parcelled up using zipapp into a single executable archive file
+# (with a .pyz extension). To aid development, it would also be helpful to be able to retrieve non-archived files that
+# are saved normally in the files system.
+#   This function will therefore determine the location of the requested file to allow the callers of this method
+#   'not to care' how or where it came from
+def importFile(filepath, archiveName=None, returnAsLines=False):
+    try:
+    # # Attempt to import an external data file from within the pyz zipped archive
+    # Or, if that fails, just get the file from the file system in the usual way
+    # fileToImport = "index.html"
+        try:
+            # Attempt, in the first instance to locate and import the file located in archiveName
+            return retrieveFileFromArchive(archiveName, filepath, returnAsLines=returnAsLines)
+        except Exception as e:
+            logToFile(f"importFile() retrieveFileFromArchive failed for file {filepath} in archive {archiveName}. "
+                      f"Trying importFileFromDisk() method instead")
+            # Importing from an archive failed, so see if the file can be imported from the file system
+            try:
+                return importFileFromDisk(filepath, returnAsLines=returnAsLines)
+            except Exception as e2:
+                raise Exception(f"retrieveFileFromArchive() failed with error ({e}), so did importFileFromDisk() ({e2})")
     except Exception as e:
         raise Exception(f"importFile() {e}")
 
@@ -244,7 +284,15 @@ def main():
     # Placeholder for the switches/args passed to this script
     argv = None
 
+    # Create a dict of shared object to be shared between all the threads
+    sharedObjects = {}
+
+    #### Pre-render some tables that can be displayed in the help-text
+    #### The first and second columns of the help tables are also used to seed getopt in order to parse the
+    #### incoming command line args
+
     # Create a dummy table in order to just get the max width of the *third* column (val will be used to wrap the text)
+    # shown in the helptext
     columnMaxWidth = AsciiTable([["x:", "python-interpreter-path= ", "z"]]).column_max_width(2)
 
     # Specify the mandatory switches/long options that can (or should be) passed. Helptext will be used
@@ -283,6 +331,7 @@ def main():
     # Note the '=' suffix (denotes to getopt that this switch will be followed by a value)
     getoptLongOptions = [f"{str(x[1]).replace('--', '')}=" for x in mandatorySwitches + optionalSwitches]
 
+    # Define the helptext that will be displayed
     helpText = textwrap.dedent(f'''\
 TL/DR This is a Python script to run Mikrotik scripts via a user friendly web gui
 
@@ -309,6 +358,14 @@ Arguments supplied: {argv}
                 exit(0)
 
             print(f"Supplied args: {sys.argv[1:]}")
+
+            # Store the first element of sys.argv (sys.argv[0]). This is the filename of the Python script itself
+            # If the program is being run via a .pyz file *which itself is a file containing a zip archive), we'll
+            # need the name of the archive so that we can extract the html file templates from it at run-time
+
+            # Create a key in sharedObjects to capture the name of this python executable archive file
+            sharedObjects["pyzArchiveName"] = sys.argv[0]
+
             # Parse the switches (and long parameters)
             opts, args = getopt.getopt(sys.argv[1:], getoptSwitches, getoptLongOptions)
 
@@ -370,9 +427,6 @@ Arguments supplied: {argv}
     signal.signal(signal.SIGINT, sigintHandler)  # Ctrl-C (keyboard interrupt)
     signal.signal(signal.SIGTERM, sigtermHandler)  # KILL
 
-    # Create a dict of shared object to be shared between all the threads
-    sharedObjects = {}
-
     # # Attempt to import an external data file from within the pyz zipped archive
     # Or, if that fails, just get the file from the file system in the usual way
     # fileToImport = "index.html"
@@ -424,7 +478,7 @@ Arguments supplied: {argv}
     # Endless loop - until a shutdown Exception is raised or some other error occurs
     while True:
         try:
-            print(".")
+            # print(".")
             time.sleep(1)
         except Shutdown as e:
             logToFile(f"shutting down {e}")
