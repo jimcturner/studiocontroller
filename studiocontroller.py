@@ -534,7 +534,7 @@ Arguments supplied: {argv}
 
     # Endless loop - until a shutdown Exception is raised or some other error occurs
     try:
-        rtr = SSHController("192.168.3.2", "kabulctrl")
+        rtr = SSHController("192.168.3.22", "kabulctrl")
     except Exception as e:
         raise Exception(f"Create SSH Controller {e}")
         exit(1)
