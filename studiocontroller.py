@@ -39,7 +39,11 @@ class SSHController(object):
     # Sends a command to a device (Mikrotik router) via SSH
     # Optionally, if it receives a response back from the device, it will call the method specified in callbackMethod()
     # with the router response and time in the form callbackMethod(response=, timestamp=....)
-    # This means that the callback method supplied should expect and accept the kwargs 'response' and 'responseTime'
+    # This means that the callback method supplied should expect and accept the kwargs:
+    # 'response' and 'responseTime' and exception
+    # NOTE: By default this method is blocking unless callbackMethod is set, in which case ssh will be called as
+    # a seperate thread and execution will return immediately back to the caller
+
     # NOte: This works from the command line: ssh kabulctrl@192.168.3.2 ':put "$[/system clock get time]"'
     # Tested using the following:
     # sendCommand(':put "$[/system clock get time], $[/system clock get date]";/tool traceroute address=8.8.8.8 count=1')
@@ -57,16 +61,21 @@ class SSHController(object):
                 # Note this will be a blocking call, as the target will have to respond OR the timeout
                 # expire before execution returns to the caller
                 response = subprocess.check_output(args, timeout=timeout)
-                return response
+                return str(response)
             else:
                 # Otherwise run the command in a separate thread. This will make the method non-blocking
                 # When the target does respond, the response will be sent back by calling the method
                 # specified in callbackMethod
                 def runAsThread():
                     # Run the command
-                    response = subprocess.check_output(args, timeout=timeout)
-                    # Send the response back to the caller via its callback method
-                    callbackMethod(response=response, timestamp=datetime.datetime.now())
+                    try:
+                        response = subprocess.check_output(args, timeout=timeout)
+                        # Send the response back to the caller via its callback method
+                        callbackMethod(response=str(response), timestamp=datetime.datetime.now(), exception=None)
+                    except Exception as e:
+                        # Trap the Exception and pass it back to the caller
+                        callbackMethod(response=None, timestamp=datetime.datetime.now(), exception=e)
+
                 # Run the command as a seperate thread
                 threading.Thread(target=runAsThread, args=()).start()
                 return None
@@ -81,6 +90,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             getMappings = {}
             self.addEndpoint(getMappings, "", self.renderIndexPage, contentType='text/html')
             self.addEndpoint(getMappings, "api", self.renderApiIndexPage, contentType='text/html')
+            self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
+                             requiredKeys=["deviceAddress", "username", "commandString"])
             return getMappings
         except Exception as e:
             raise Exception(f"apiGETEndpoints(), {e}")
@@ -124,12 +135,23 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         parent = self.server.parentObject
         try:
             # Attempt to import the index.html page
-            htmlFile = importFile("index.html", archiveName=parent.externalResourcesDict["pyzArchiveName"])
+            htmlFile = importFile("html/index.html", archiveName=parent.externalResourcesDict["pyzArchiveName"])
             # Insert any dynamic content
             htmlFile = HTTPTools.insertAfter(htmlFile, "<currentTime>", datetime.datetime.now().strftime("%H:%M:%S"))
             return htmlFile
         except Exception as e:
             raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}")
+
+    def sendCommandViaSSH(self, deviceAddress, username, commandString):
+        try:
+            # Create a device
+            rtr = SSHController(deviceAddress, username)
+            # Send the commandString to the device
+            response = rtr.sendCommand(commandString)
+            return response
+
+        except Exception as e:
+            raise Exception(f"sendCommandViaSSH() {e}")
 
 
 # Tests the current Python interpreter version
@@ -532,20 +554,20 @@ Arguments supplied: {argv}
         except Exception as e:
             logToFile(f"shutdown() {e}")
 
-    # Endless loop - until a shutdown Exception is raised or some other error occurs
-    try:
-        rtr = SSHController("192.168.3.22", "kabulctrl")
-    except Exception as e:
-        raise Exception(f"Create SSH Controller {e}")
-        exit(1)
-
-    def routerCallback(response=None, timestamp=None):
-        print(f"routerCallback() {timestamp}: {response}")
+    # # Endless loop - until a shutdown Exception is raised or some other error occurs
+    # try:
+    #     rtr = SSHController("192.168.3.2", "kabulctrl")
+    # except Exception as e:
+    #     raise Exception(f"Create SSH Controller {e}")
+    #     exit(1)
+    #
+    # def routerCallback(response=None, timestamp=None, exception=None):
+    #     print(f"routerCallback() {timestamp}: {response}, exception: {exception}")
 
     while True:
         try:
             # print(".")
-            rtr.sendCommand(':put "$[/system clock get time]"', callbackMethod=routerCallback)
+            # rtr.sendCommand(':put "$[/system clock get time]"', callbackMethod=routerCallback)
             time.sleep(2)
         except Shutdown as e:
             logToFile(f"shutting down {e}")
@@ -560,10 +582,6 @@ Arguments supplied: {argv}
     except Exception as e:
         logToFile(f"ERR: Shutdown error {e}")
         exit(1)
-
-
-
-
 
 if __name__ == '__main__':
     main()
