@@ -16,7 +16,8 @@ import textwrap
 from terminaltables import AsciiTable
 
 
-from HTTPServerSuite import HttpServerCreator, HTTPRequestHandlerRTP
+from HTTPServerSuite import HttpServerCreator, HTTPRequestHandlerRTP, HTTPTools
+
 
 # Custom Exception used to trigger/detect a shutdown request (via SIGINT or SIGKILL)
 class Shutdown(Exception):
@@ -71,7 +72,10 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         parent = self.server.parentObject
         try:
             # Attempt to import the index.html page
-            return importFile("index.html", archiveName=parent.externalResourcesDict["pyzArchiveName"])
+            htmlFile = importFile("index.html", archiveName=parent.externalResourcesDict["pyzArchiveName"])
+            # Insert any dynamic content
+            htmlFile = HTTPTools.insertAfter(htmlFile, "<currentTime>", datetime.datetime.now().strftime("%H:%M:%S"))
+            return htmlFile
         except Exception as e:
             raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}")
 
@@ -210,7 +214,8 @@ def archiveLogs(file, maxSize):
 # If the log file gets larger than logfileMaxSize_MB, it will be automatically archived
 def logToFile(logMessage, logfileName="studiocontroller_log.txt", logfileMaxSize_MB=1):
     try:
-        print(logMessage)
+        timeNow = datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')
+        print(f"{timeNow}: {logMessage}")
         # Check the filesize before writing. If too large, archive it
         archiveLogs(logfileName, (logfileMaxSize_MB * 1024 * 1024))
         # Open file for appending (using 'with' means that the OS will take care of closing it)
@@ -221,7 +226,7 @@ def logToFile(logMessage, logfileName="studiocontroller_log.txt", logfileMaxSize
         # If writing to disk fails, write to stderr instead
         try:
             sys.stderr.write(f"ERR:isptestlauncher.logToFile(): {logfileName}, "
-                             f"{datetime.datetime.now().strftime('%d/%m/%y %H:%M:%S')}, {logMessage}\n")
+                             f"{timeNow}, {logMessage}\n")
         except:
             # Fail silently
             pass

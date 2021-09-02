@@ -26,41 +26,44 @@ class HTTPTools(object):
     # by the destination function/method
     @classmethod
     def mapURLQueryToFnArgs(cls, query_componentsDict):
-        # Take a shallow copy of the incoming dict
-        functionArgsDict = dict(query_componentsDict)
-        # Iterate over all the key/value pairs
-        for key in functionArgsDict:
-            # Iterate over each of the values in the list associated with each key and convert from strings to normal
-            # Python types, based on the contents
-            for listItem in range(len(functionArgsDict[key])):
-                # Values will be a list
-                # Test to see if this is a boolean val. If so, recast as a bool (since all
-                # incoming values are strings)
-                if functionArgsDict[key][listItem] in ["False", "false", "No", "no"]:
-                    functionArgsDict[key][listItem] = False
-                elif functionArgsDict[key][listItem] in ["True", "true", "Yes", "yes"]:
-                    functionArgsDict[key][listItem] = True
-                else:
-                    # Test if the value is an integer
-                    if str(functionArgsDict[key][listItem]).isnumeric():
-                        # only values 0-9 present, so cast as an integer
-                        functionArgsDict[key][listItem] = int(functionArgsDict[key][listItem])
+        try:
+            # Take a shallow copy of the incoming dict
+            functionArgsDict = dict(query_componentsDict)
+            # Iterate over all the key/value pairs
+            for key in functionArgsDict:
+                # Iterate over each of the values in the list associated with each key and convert from strings to normal
+                # Python types, based on the contents
+                for listItem in range(len(functionArgsDict[key])):
+                    # Values will be a list
+                    # Test to see if this is a boolean val. If so, recast as a bool (since all
+                    # incoming values are strings)
+                    if functionArgsDict[key][listItem] in ["False", "false", "No", "no"]:
+                        functionArgsDict[key][listItem] = False
+                    elif functionArgsDict[key][listItem] in ["True", "true", "Yes", "yes"]:
+                        functionArgsDict[key][listItem] = True
                     else:
-                        # See if the value is float by trying to cast it as a float (this will fail, if it's not)
-                        try:
-                            functionArgsDict[key][listItem] = float(functionArgsDict[key][listItem])
-                        except:
-                            # Casting as a float failed, so ignore
-                            pass
+                        # Test if the value is an integer
+                        if str(functionArgsDict[key][listItem]).isnumeric():
+                            # only values 0-9 present, so cast as an integer
+                            functionArgsDict[key][listItem] = int(functionArgsDict[key][listItem])
+                        else:
+                            # See if the value is float by trying to cast it as a float (this will fail, if it's not)
+                            try:
+                                functionArgsDict[key][listItem] = float(functionArgsDict[key][listItem])
+                            except:
+                                # Casting as a float failed, so ignore
+                                pass
 
-            # Finally, test to see if there is only a single value corresponding with that key
-            # i.e does the list only contain a single element?
-            if len(functionArgsDict[key]) == 1:
-                # If so, get rid of the list encompassing the value and assign the
-                # value directly to the key instead
-                functionArgsDict[key] = functionArgsDict[key][0]
+                # Finally, test to see if there is only a single value corresponding with that key
+                # i.e does the list only contain a single element?
+                if len(functionArgsDict[key]) == 1:
+                    # If so, get rid of the list encompassing the value and assign the
+                    # value directly to the key instead
+                    functionArgsDict[key] = functionArgsDict[key][0]
 
-        return functionArgsDict
+            return functionArgsDict
+        except Exception as e:
+            raise Exception(f"HTTPTools.mapURLQueryToFnArgs() {e}")
 
     # Simple shortcut function to remove a list[] of keys from the supplied dictionary
     # If the searched-for key is missing, it will be ignored
@@ -68,50 +71,75 @@ class HTTPTools(object):
     # Returns a list of the keys that were actually removed
     @classmethod
     def removeMultipleDictKeys(cls, dictToBeModified, keysToBeRemoved):
-        # List returned by function to contain a list of the keys that were actually removed
-        keysRemoved = []
-        for k in keysToBeRemoved:
-            if k in dictToBeModified:
-                # Delete key k from the dict
-                dictToBeModified.pop(k, None)
-                # Record the deletion
-                keysRemoved.append(k)
-        return keysRemoved
+        try:
+            # List returned by function to contain a list of the keys that were actually removed
+            keysRemoved = []
+            for k in keysToBeRemoved:
+                if k in dictToBeModified:
+                    # Delete key k from the dict
+                    dictToBeModified.pop(k, None)
+                    # Record the deletion
+                    keysRemoved.append(k)
+            return keysRemoved
+        except Exception as e:
+            raise Exception(f"HTTPTools.removeMultipleDictKeys() {e}")
+
 
     # Shortcut function to create a subset of the supplied dictionary containing only wantedKeys[]
     # If the wanted keys are missing from sourceDict, they will be ignored
     # Answer from here: https://stackoverflow.com/a/5352649
     @classmethod
     def extractWantedKeysFromDict(cls, sourceDict, wantedKeys):
-        filteredDict = dict((k, sourceDict[k]) for k in wantedKeys if k in sourceDict)
-        return filteredDict
+        try:
+            filteredDict = dict((k, sourceDict[k]) for k in wantedKeys if k in sourceDict)
+            return filteredDict
+        except Exception as e:
+            raise Exception(f"HTTPTools.extractWantedKeysFromDict() {e}")
 
     # Renders a nested dict of dicts as an html table
     # columnTitles is a list of string representing the column titles
     # columnKeys is list of keys to be picked from the nested dict within each key of srcDict
     @classmethod
     def createHTMLTable(cls, srcDict, title, columnTitles, columnKeys):
-        tableData = f'<table border="1">'
-        # Create title row
-        tableData += f"<tr><td>{title}</tr></td>"
-        # Create table column headings
-        if len(columnTitles) > 0:
-            tableData += f"<tr><td>{'</td><td>'.join(columnTitles)}</td></tr>"
-        # Extract values from srcDict to create the data rows
-        if len(columnKeys) > 0:
-            # Iterate over srcDict to create the rows
-            for row in srcDict:
-                tableData += f"<tr><td><a href={row}>{row}</a></td>"  # The srcDict key itself should be the first cell data
-                if len(columnKeys) > 0:
-                    for key in columnKeys:
-                        if key in srcDict[row]:
-                            cellData = srcDict[row][key]
-                        else:
-                            cellData = f"key {key} missing"
-                        tableData += f'<td>{cellData}</td>'
-                tableData += f"</tr>"
-        tableData += f"</table>"
-        return tableData
+        try:
+            tableData = f'<table border="1">'
+            # Create title row
+            tableData += f"<tr><td>{title}</tr></td>"
+            # Create table column headings
+            if len(columnTitles) > 0:
+                tableData += f"<tr><td>{'</td><td>'.join(columnTitles)}</td></tr>"
+            # Extract values from srcDict to create the data rows
+            if len(columnKeys) > 0:
+                # Iterate over srcDict to create the rows
+                for row in srcDict:
+                    tableData += f"<tr><td><a href={row}>{row}</a></td>"  # The srcDict key itself should be the first cell data
+                    if len(columnKeys) > 0:
+                        for key in columnKeys:
+                            if key in srcDict[row]:
+                                cellData = srcDict[row][key]
+                            else:
+                                cellData = f"key {key} missing"
+                            tableData += f'<td>{cellData}</td>'
+                    tableData += f"</tr>"
+            tableData += f"</table>"
+            return tableData
+        except Exception as e:
+            raise Exception(f"HTTPTools.createHTMLTable() {e}")
+
+    # Intended to be used to search an incoming string (inputString), search for tagToFind and insert
+    # stringToInsert immediately after it.from
+    # It's prime function is to insert contents into a pre-rendered html file
+    # It will return the modified inputString containing stringToInsert
+    @classmethod
+    def insertAfter(cls, inputString, tagToFind, stringToInsert):
+        try:
+            # Locate the character position just after the <head> tag
+            index = inputString.find(tagToFind) + len(tagToFind)
+            # Insert the <stringToInsert> content straight after the <tagToFind> tag
+            response = f'{inputString[:index]}{stringToInsert}{inputString[index:]}'
+            return response
+        except Exception as e:
+            raise Exception(f"HTTPTools.insertAfter() {e}")
 
 
 class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
