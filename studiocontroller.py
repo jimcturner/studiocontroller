@@ -5,8 +5,10 @@
 # James Turner 2021
 import datetime
 import os
+import shlex
 import signal
 import socket
+import subprocess
 import sys
 import time
 import zipfile
@@ -22,6 +24,41 @@ from HTTPServerSuite import HttpServerCreator, HTTPRequestHandlerRTP, HTTPTools
 # Custom Exception used to trigger/detect a shutdown request (via SIGINT or SIGKILL)
 class Shutdown(Exception):
     pass
+
+# Provides a means of controlling a Mikroktik router by passing in commands via ssh
+class SSHController(object):
+    def __init__(self, deviceIpAddress, username, password=None, tcpPort=22) -> None:
+        super().__init__()
+        self.deviceIpAddress = deviceIpAddress
+        self.tcpPort = tcpPort
+        self.username = username
+        self.password = password
+
+
+    # Sends a command to a device (Mikrotik router) via SSH
+    # Optionally, if it receives a response back from the device, it will call the method specified in callbackMethod()
+    # with the router response and time in the form callbackMethod(response=, responseTime=....)
+    # This means that the callback method supplied should expect and accept the kwargs 'response' and 'responseTime'
+    # NOte: This works from the command line: ssh kabulctrl@192.168.3.2 ':put "$[/system clock get time]"'
+    # Tested using the following:
+    # sendCommand(':put "$[/system clock get time], $[/system clock get date]";/tool traceroute address=8.8.8.8 count=1')
+    # Note: Because the Mikrotik command itself contains double quotes, single quotes were used ot wrap the string passed
+    # to sendCommand()
+    def sendCommand(self, commandString, timeout=5, callbackMethod=None):
+        # Create the command string that would be written on the command line
+        # NOTE: commandString is enclosed in single quotes
+        cmds = f"ssh {self.username}@{self.deviceIpAddress} '{commandString}'"
+        print(f"cmds: {cmds}")
+        # Split the string using shlex.split() into a list of args compatible with subprocess.check_output
+        args = shlex.split(cmds)
+        print(f"args: {args}")
+        try:
+            response = subprocess.check_output(args, timeout=timeout)
+            return response
+        except Exception as e:
+            raise Exception(f"SSHController.sendCommand() commandString: {commandString}, error: {e}")
+
+
 
 class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
     def apiGETEndpoints(self):
