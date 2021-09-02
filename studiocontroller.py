@@ -10,6 +10,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import zipfile
 import getopt
@@ -37,7 +38,7 @@ class SSHController(object):
 
     # Sends a command to a device (Mikrotik router) via SSH
     # Optionally, if it receives a response back from the device, it will call the method specified in callbackMethod()
-    # with the router response and time in the form callbackMethod(response=, responseTime=....)
+    # with the router response and time in the form callbackMethod(response=, timestamp=....)
     # This means that the callback method supplied should expect and accept the kwargs 'response' and 'responseTime'
     # NOte: This works from the command line: ssh kabulctrl@192.168.3.2 ':put "$[/system clock get time]"'
     # Tested using the following:
@@ -45,16 +46,30 @@ class SSHController(object):
     # Note: Because the Mikrotik command itself contains double quotes, single quotes were used ot wrap the string passed
     # to sendCommand()
     def sendCommand(self, commandString, timeout=5, callbackMethod=None):
-        # Create the command string that would be written on the command line
-        # NOTE: commandString is enclosed in single quotes
-        cmds = f"ssh {self.username}@{self.deviceIpAddress} '{commandString}'"
-        print(f"cmds: {cmds}")
-        # Split the string using shlex.split() into a list of args compatible with subprocess.check_output
-        args = shlex.split(cmds)
-        print(f"args: {args}")
         try:
-            response = subprocess.check_output(args, timeout=timeout)
-            return response
+            # Create the command string that would be written on the command line
+            # NOTE: commandString is enclosed in single quotes
+            cmds = f"ssh {self.username}@{self.deviceIpAddress} '{commandString}'"
+            # Split the string using shlex.split() into a list of args compatible with subprocess.check_output
+            args = shlex.split(cmds)
+            if callbackMethod is None:
+                # Simply run the command and return the response to the caller
+                # Note this will be a blocking call, as the target will have to respond OR the timeout
+                # expire before execution returns to the caller
+                response = subprocess.check_output(args, timeout=timeout)
+                return response
+            else:
+                # Otherwise run the command in a separate thread. This will make the method non-blocking
+                # When the target does respond, the response will be sent back by calling the method
+                # specified in callbackMethod
+                def runAsThread():
+                    # Run the command
+                    response = subprocess.check_output(args, timeout=timeout)
+                    # Send the response back to the caller via its callback method
+                    callbackMethod(response=response, timestamp=datetime.datetime.now())
+                # Run the command as a seperate thread
+                threading.Thread(target=runAsThread, args=()).start()
+                return None
         except Exception as e:
             raise Exception(f"SSHController.sendCommand() commandString: {commandString}, error: {e}")
 
@@ -518,10 +533,20 @@ Arguments supplied: {argv}
             logToFile(f"shutdown() {e}")
 
     # Endless loop - until a shutdown Exception is raised or some other error occurs
+    try:
+        rtr = SSHController("192.168.3.2", "kabulctrl")
+    except Exception as e:
+        raise Exception(f"Create SSH Controller {e}")
+        exit(1)
+
+    def routerCallback(response=None, timestamp=None):
+        print(f"routerCallback() {timestamp}: {response}")
+
     while True:
         try:
             # print(".")
-            time.sleep(1)
+            rtr.sendCommand(':put "$[/system clock get time]"', callbackMethod=routerCallback)
+            time.sleep(2)
         except Shutdown as e:
             logToFile(f"shutting down {e}")
             break
