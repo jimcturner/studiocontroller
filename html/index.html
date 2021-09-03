@@ -1,11 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>IBEOO Studio Controller</title>
+<!-- <head>  -->
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBEOO Studio
+  Controller</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/fontawesome.min.css">
+
+<script>
+  function myFunction(name, job) {
+    document.getElementById("status").innerHTML = "Welcome " + name + ", the " +
+      job + ".";
+  }
+
+  function sendCommandToMikrotik() { // Define the URL where the
+    data will be fetched from
+    let url = new
+    URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=:put%20%22$[/system%20clock%20get%20time]%22');
+    Fetch the response fetch(url) .then(response => response.text())
+    .then(data => document.getElementById("status").innerHTML = data);
+
+  }
+</script>
+
 </head>
+
 <body>
-<h1>IBEOO Studio Controller V1.0</h1>
-Requested at: <currentTime></currentTime>
+  <!-- Including Bootstrap JS (with its jQuery dependency) so that
+    dynamic components work -->
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+  <h1>IBEOO Studio Controller V1.0</h1> Requested at: <currentTime></currentTime>
+  <p>Click "Try it" to call a function with arguments</p>
+
+  <button onclick="myFunction('Harry Potter','Wizard')">Try it</button> <button onclick="sendCommandToMikrotik()">Send Mikrotik Command</button>
+  <p id="status"></p>
 </body>
+
 </html>

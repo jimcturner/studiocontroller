@@ -37,10 +37,11 @@ class SSHController(object):
 
 
     # Sends a command to a device (Mikrotik router) via SSH
-    # Optionally, if it receives a response back from the device, it will call the method specified in callbackMethod()
-    # with the router response and time in the form callbackMethod(response=, timestamp=....)
-    # This means that the callback method supplied should expect and accept the kwargs:
-    # 'response' and 'responseTime' and exception
+    # Optionally, if it receives a response back from the device, it will call the callback method specified in onSuccess
+    # with the router response and time in the form on (response)
+
+    # If the onFailure callback method is specified, this will be called if an Exception is raised
+
     # NOTE: By default this method is blocking unless callbackMethod is set, in which case ssh will be called as
     # a seperate thread and execution will return immediately back to the caller
 
@@ -49,19 +50,19 @@ class SSHController(object):
     # sendCommand(':put "$[/system clock get time], $[/system clock get date]";/tool traceroute address=8.8.8.8 count=1')
     # Note: Because the Mikrotik command itself contains double quotes, single quotes were used ot wrap the string passed
     # to sendCommand()
-    def sendCommand(self, commandString, timeout=5, callbackMethod=None):
+    def sendCommand(self, commandString, timeout=5, onSuccess=None, onFailure=None):
         try:
             # Create the command string that would be written on the command line
             # NOTE: commandString is enclosed in single quotes
             cmds = f"ssh {self.username}@{self.deviceIpAddress} '{commandString}'"
             # Split the string using shlex.split() into a list of args compatible with subprocess.check_output
             args = shlex.split(cmds)
-            if callbackMethod is None:
+            if onSuccess is None:
                 # Simply run the command and return the response to the caller
                 # Note this will be a blocking call, as the target will have to respond OR the timeout
                 # expire before execution returns to the caller
                 response = subprocess.check_output(args, timeout=timeout)
-                return str(response)
+                return response
             else:
                 # Otherwise run the command in a separate thread. This will make the method non-blocking
                 # When the target does respond, the response will be sent back by calling the method
@@ -71,10 +72,11 @@ class SSHController(object):
                     try:
                         response = subprocess.check_output(args, timeout=timeout)
                         # Send the response back to the caller via its callback method
-                        callbackMethod(response=str(response), timestamp=datetime.datetime.now(), exception=None)
+                        onSuccess(response)
                     except Exception as e:
-                        # Trap the Exception and pass it back to the caller
-                        callbackMethod(response=None, timestamp=datetime.datetime.now(), exception=e)
+                        if onFailure is not None:
+                            # Trap the Exception and pass it back to the caller
+                            onFailure(e)
 
                 # Run the command as a seperate thread
                 threading.Thread(target=runAsThread, args=()).start()
@@ -148,7 +150,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             rtr = SSHController(deviceAddress, username)
             # Send the commandString to the device
             response = rtr.sendCommand(commandString)
-            return response
+            # return f"Device response of type {type(response)}: {response.decode('utf-8')}"
+            return response.decode('utf-8')
 
         except Exception as e:
             raise Exception(f"sendCommandViaSSH() {e}")
