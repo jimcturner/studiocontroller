@@ -18,8 +18,9 @@
 
   function sendCmdToMikrotik(commandString) {
     // Define the URL where the data will be fetched from
-    let url = new
-    URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString);
+    // let url = new
+    // URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString);
+    let url = new URL('<sendCmdToMikrotikAPIURL></<sendCmdToMikrotikAPIURL>')
     document.getElementById("status").innerHTML = "Please Wait..."
     // Fetch the response
     fetch(url).then(response => response.text())
