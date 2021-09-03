@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <!-- <head>  -->
+<head>
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,9 +16,11 @@
       job + ".";
   }
 
-  function sendCommandToMikrotik() { // Define the URL where the data will be fetched from
+  function sendCmdToMikrotik(commandString) {
+    // Define the URL where the data will be fetched from
     let url = new
-    URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=:put%20%22$[/system%20clock%20get%20time]%22');
+    URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString);
+    document.getElementById("status").innerHTML = "Please Wait..."
     // Fetch the response
     fetch(url).then(response => response.text())
     .then(data => document.getElementById("status").innerHTML = data);
@@ -32,12 +35,19 @@
     dynamic components work -->
   <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-  <h1>IBEOO Studio Controller V1.0</h1> Requested at: <currentTime></currentTime>
-  <p>Click "Try it" to call a function with arguments</p>
+  <h1>IBEOO Studio Controller V1.0</h1>
+  Requested at: <currentTime></currentTime>
+  <table border="1">
+    <tr>
+      <td><p>Current routing status:</p></td><td style="width:200px"><p id="status"></p></td>
+    </tr>
 
-  <button onclick="myFunction('Harry Potter','Wizard')">Try it</button>
-  <button onclick="sendCommandToMikrotik()">Send Mikrotik Command</button>
-  <p id="status"></p>
+  </table>
+  <br>
+  <button onclick="sendCmdToMikrotik(':put%20%22$[/system%20clock%20get%20time]%22')">Send Mikrotik Command</button>
+  <routerSelectors></routerSelectors>
+
+
 </body>
 
 </html>
