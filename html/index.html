@@ -15,11 +15,11 @@
       job + ".";
   }
 
-  function sendCommandToMikrotik() { // Define the URL where the
-    data will be fetched from
+  function sendCommandToMikrotik() { // Define the URL where the data will be fetched from
     let url = new
     URL('http://192.168.3.64:10000/api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=:put%20%22$[/system%20clock%20get%20time]%22');
-    Fetch the response fetch(url) .then(response => response.text())
+    // Fetch the response
+    fetch(url).then(response => response.text())
     .then(data => document.getElementById("status").innerHTML = data);
 
   }
