@@ -27,6 +27,14 @@
     .then(data => document.getElementById(destFieldID).innerHTML = data);
 
   }
+  // Create timed auto-polling of the ssh commands that will populate the statusFields
+  // defined in statusFields
+  function registerPollers(){
+    //<sshPollers>
+    
+  }
+  // Automarically call registerPollers() when the page has loaded
+  window.onload = registerPollers
 </script>
 
 </head>
@@ -38,12 +46,7 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   <h1>IBEOO Studio Controller V1.0</h1>
   Requested at: <currentTime></currentTime>
-  <!-- <table border="1">
-    <tr>
-      <td><p>Current cmd status:</p></td><td style="width:200px"><p id="cmd_response"></p></td>
-    </tr>
 
-  </table> -->
   <br>
   <statusFields></statusFields>
   <br>
