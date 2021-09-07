@@ -150,7 +150,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # controllerDefinitions["statusFieldMappings"]. The resultant javascript code will be inserted into the
             # registerPollers() method (the skeleton of which is declared in html/index.html
             # Dynamically render the registerPollers() code for all status fields defined in controllerDefinitions["statusFieldMappings"]
-            registerPollersJS = f"""\nwindow.setInterval("sendCmd('{controllerDefinitions['deviceAddress']}', '{controllerDefinitions['deviceSshUsername']}', '{controllerDefinitions["statusFieldMappings"][0]["target_cmd_string"]}, '{controllerDefinitions["statusFieldMappings"][0]["id"]}')", {controllerDefinitions["statusFieldMappings"][0]["polling_interval_ms"]});"""
+            registerPollersJS = f"""\nwindow.setInterval(sendCmd, {controllerDefinitions["statusFieldMappings"][1]["polling_interval_ms"]}, '{controllerDefinitions['deviceAddress']}', '{controllerDefinitions['deviceSshUsername']}', '{controllerDefinitions["statusFieldMappings"][1]["target_cmd_string"]}', '{controllerDefinitions["statusFieldMappings"][1]["id"]}');"""
             # Insert the javascript method code into the html template
             htmlFile = HTTPTools.insertAfter(htmlFile, "registerPollers(){", registerPollersJS)
 
@@ -444,7 +444,7 @@ def main():
             },
             {
                 "label": "Current Router Clock",
-                "target_cmd_string": ':put $[/system clock get time]"',
+                "target_cmd_string": ':put "$[/system clock get time]"',
                 "id": "uTik_timeOfDay",
                 "polling_interval_ms": 2000
             }
