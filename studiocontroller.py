@@ -261,7 +261,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # a zipped archive
             try:
                 # Browse the pyz archive first (if possible).
-                archiveFileList = HTTPTools.listFilesInArchive(archiveName=parent.externalResourcesDict["pyzArchiveName"])
+                archiveName = parent.externalResourcesDict["pyzArchiveName"]
+                archiveFileList = HTTPTools.listFilesInArchive(archiveName=archiveName)
             except Exception as e:
                 self.log_error(f"browseFileSystem.listFilesInArchive() {e}")
             # Get a list of files from the current working folder and subfolders
@@ -269,9 +270,18 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             htmlContent = f"<h1> Local File system" \
                    f"<table>" \
                    f"{''.join([f'<tr><td><a href={file}>{file}</a></td></tr>' for file in fileList])}"\
-                   f"</table>"
-
-            htmlWrapped = self.htmlWrap(title="File browser", body=htmlContent, head='<base href="../"')
+                   f"</table>" \
+                  f"<br>" \
+                  f"<h1> Archive file system ({archiveName})" \
+                  f"<table>" \
+                   f"{''.join([f'<tr><td><a href={file}>{file}</a></td></tr>' for file in archiveFileList])}"\
+                   f"</table>" \
+            # Wrap the tables in an html body
+            # NOTE: This endpoint is accessed via the /debug endpoint. This means that, by defsult all the hrefs
+            # will start with /debug/filexxx
+            # This is no good. We need to re-point the 'base url reference up one level to the root'
+            # we do this by inserting the <base href="../"> tag within the html <head></head> tags'
+            htmlWrapped = self.htmlWrap(title="File browser", body=htmlContent, head='<base href="../">')
             # return "\n".join(archiveFileList + fileList)
             return htmlWrapped
         except Exception as e:
