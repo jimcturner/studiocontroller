@@ -40,7 +40,7 @@
     }
 
     // Get current time as HH:MM
-    function currentTime(){
+    function currentTime() {
       return new Date().toLocaleTimeString([], {
         hour: '2-digit',
         minute: "2-digit",
@@ -48,39 +48,34 @@
       })
 
     }
+    // Sends a command to a device via SSH
+    // If destFieldID is set to 'undefined', the output will be ignored
     function sendCmd(targetAddr, username, commandString, destFieldID) {
       // Construct the (relative) URL query where the data will be fetched from
-      // 'api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString
       let url = 'api/sshcmd?deviceAddress=' + targetAddr + "&username=" + username + "&commandString=" + commandString
-      // let url = '<apiUrlSendCmdToMikrotik>' + commandString
-      // document.getElementById(destFieldID).innerHTML = "Please Wait..."
-      // // Get current time
-      // timeNow = new Date().toLocaleTimeString([], {
-      //   hour: '2-digit',
-      //   minute: "2-digit",
-      //   hour12: false
-      // })
+
       // Update status bar
       document.getElementById("cmd_sent").innerHTML = "(" + currentTime() + ")" + commandString + "==>" + username + "@" + targetAddr
       // Clear status bar response field
       document.getElementById("cmd_success").innerHTML = "Waiting.."
       // Fetch the response. Catch any errors and log to the javascript console
-      // fetch(url).then(detectErrors).then(response => response.text())
-      // .then(data => document.getElementById(destFieldID).innerHTML = data).catch(error => console.log(error));
-
       fetch(url).then(detectErrors).then(response => response.text())
-        .then(function (data) {
-          document.getElementById(destFieldID).innerHTML = data;
+        .then(function(data) {
+          // Update the target destFieldID (only if specified, otherwise write to the javascript console)
+          if (destFieldID == undefined){
+              console.log("Request: " + url + ", Response: " + data)
+          }
+          else {
+            document.getElementById(destFieldID).innerHTML = data;
+          }
+          // Update the status bar
           document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
         }).catch(error => console.log(error));
 
-
-      // Update status bar response field
-      // document.getElementById("cmd_success").innerHTML = "(" + timeNow + ") OK"
     }
     // Create timed auto-polling of the ssh commands that will populate the statusFields
     // defined in statusFields
-    function registerPollers(){
+    function registerPollers() {
       // Note: This method will be auto rendered when the page is created
       // and the tag below will be detected by the renderer
       // ##INSERT_POLLERS
@@ -109,9 +104,9 @@
   <!-- Define a status bar for the latest commands and statuses -->
   <br>
   <br>
-  <table border="1">
+  <table border="1" style='font-size:80%'>
     <tr>
-      <td>Current cmd status</td>
+      <td>Status</td>
       <td id="cmd_sent">&nbsp;</td>
       <td id="cmd_success">&nbsp;</td>
     </tr>

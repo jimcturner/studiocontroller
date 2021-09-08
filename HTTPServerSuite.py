@@ -8,6 +8,7 @@
 import json
 import textwrap
 import threading
+import zipfile
 from abc import abstractmethod
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer, HTTPServer
 from urllib.parse import parse_qs, urlparse, parse_qsl, urlencode
@@ -140,6 +141,79 @@ class HTTPTools(object):
             return response
         except Exception as e:
             raise Exception(f"HTTPTools.insertAfter() {e}")
+
+    # Extracts a file from a zip archive
+    # Based on an answer here: https://stackoverflow.com/a/62604682
+    # Allows non-python files incorporated into the zipapp .pyz archive to be extracted at run-time
+    # If returnAsBytes==True, the imported file will be returned as a bytestring
+    # elif returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
+    # else (default) the imported file will be returned as a UTF8 string
+    # Ascii can be returned if the function is called with returnStringType='ascii'
+    @classmethod
+    def retrieveFileFromArchive(cls, archiveName, filepath, returnAsBytes=False, returnAsLines=False,
+                                returnStringType='utf-8'):
+        try:
+            with zipfile.ZipFile(archiveName) as zf:
+                with zf.open(filepath) as f:
+                    if returnAsBytes:
+                        # Return as a bytes object (return the imported file, untouched)
+                        return f.read()
+                    elif returnAsLines:
+                        # Return as a list of lines
+                        return f.read().decode(returnStringType).splitlines()
+                    else:
+                        # Return as a contiguous string (containing newlines)
+                        return f.read().decode(returnStringType)
+        except Exception as e:
+            raise Exception(f"retrieveFileFromArchive() couldn't import {filepath} from {archiveName}, {type(e)}:{e}")
+
+    # Utility method to import a file from disk
+    # if returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
+    # else (default) the imported file will be returned as a UTF8 string
+    @classmethod
+    def importFileFromDisk(cls, filepath, returnAsLines=False):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                if returnAsLines:
+                    # Return as a list of lines
+                    return f.read().splitlines()
+                else:
+                    # Return as a bytes object (return the imported file, untouched)
+                    return f.read()
+
+        except Exception as e:
+            raise Exception(f"importFileFromDisk() {e}")
+
+    # This is a wrapper for retrieveFileFromArchive() and importFileFromDisk()
+    # It's purpose is to retrieve a requested file either from the file system, or (if archiveName is not None),
+    # from a zipped archive (which is expected to be an executable Python archive created by zipapp)
+    # (i.e. archiveName is the name of a zip archive (or path) that *does* exist in the filesystem
+    # WHY BOTHER:
+    #   The distribution version of studiocontroller will be parcelled up using zipapp into a single executable archive file
+    # (with a .pyz extension). To aid development, it would also be helpful to be able to retrieve non-archived files that
+    # are saved normally in the files system.
+    #   This function will therefore determine the location of the requested file to allow the callers of this method
+    #   'not to care' how or where it came from
+    @classmethod
+    def importFile(cls, filepath, archiveName=None, returnAsLines=False):
+        try:
+            # # Attempt to import an external data file from within the pyz zipped archive
+            # Or, if that fails, just get the file from the file system in the usual way
+            # fileToImport = "index.html"
+            try:
+                # Attempt, in the first instance to locate and import the file located in archiveName
+                return cls.retrieveFileFromArchive(archiveName, filepath, returnAsLines=returnAsLines)
+            except Exception as e:
+                # logToFile(f"importFile() retrieveFileFromArchive failed for file {filepath} in archive {archiveName}. "
+                #           f"Trying importFileFromDisk() method instead")
+                # Importing from an archive failed, so see if the file can be imported from the file system
+                try:
+                    return cls.importFileFromDisk(filepath, returnAsLines=returnAsLines)
+                except Exception as e2:
+                    raise Exception(
+                        f"retrieveFileFromArchive() failed with error ({e}), so did importFileFromDisk() ({e2})")
+        except Exception as e:
+            raise Exception(f"importFile() {e}")
 
 
 class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
@@ -471,8 +545,29 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
                     self._set_response(contentType='application/json')
 
             else:
-                # path not recognised
-                raise Exception(f"Path not recognised {self.path}")
+                # path not recognised, attempt to requested resource from disk (or archive)
+                try:
+                    # Attempt to import the index.html page
+                    # path = "html/index.html"
+                    archiveName = parent.externalResourcesDict['pyzArchiveName']
+                    self.log_error(f"Attempt to load: {path} from {archiveName}")
+                    try:
+                        htmlFile = HTTPTools.retrieveFileFromArchive(parent.externalResourcesDict["pyzArchiveName"], path)
+                    except Exception as e:
+                        self.log_error(f"Can't extract {path} from archive {archiveName} {e}, trying local file system instead")
+                        try:
+                            htmlFile = HTTPTools.importFileFromDisk(path)
+
+                        except Exception as e:
+                            raise Exception(f"Can't load {path} from filesystem {e}")
+
+                    # self.log_error(f"Import file: {path}, {htmlFile}")
+                    response = htmlFile.encode('utf-8')
+                    self._set_response(contentType='text/html')
+                except Exception as e:
+                    raise Exception(f"Didn't recognise {path} and import failed: {e}")
+
+
 
             # Write the response back to the client
             self.wfile.write(response)
