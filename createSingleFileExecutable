@@ -32,7 +32,7 @@ echo "downloading dependancies into new subfolder $targetSubFolder"
 # python3 -m pip install  ${dependencies[@]} --target $targetSubFolder
 
 echo 'Copying *.py (program code) and html folder into target subfolder $targetSubFolder for parcelling up with dependencies'
-cp -r *.py html $targetSubFolder
+cp -r *.py html *.ico $targetSubFolder
 
 echo "Creating $targetSubFolder.pyz file from contents of $targetSubFolder" 
 python3 -m zipapp $targetSubFolder -c -p "/usr/bin/env python" -m "$zipappMainScript:main" -o "$zipappMainScript.pyz"

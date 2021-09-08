@@ -299,7 +299,8 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
         # Dict of possible mimetypes mapping the file extension to the mimetype
         contentTypes = {
             ".html": 'text/html',
-            ".jpeg": 'image/jpeg'
+            ".jpeg": 'image/jpeg',
+            ".ico": "image/x-icon"
         }
         try:
             # Extract the file extension from the path
