@@ -216,6 +216,32 @@ class HTTPTools(object):
         except Exception as e:
             raise Exception(f"importFile() {e}")
 
+    # Recursively lists the contents of the local filesystem
+    @classmethod
+    def listFilesInFileSystem(cls):
+        try:
+            # Use os.walk to recursively list all the files available in the current folder and below
+            # Note: os.path.join() prefaces all file paths with './' which isn't very helpful, therefore
+            # any leading ./ is stripped off
+            return [f"{str(os.path.join(currentpath, file)).replace('./', '', 1)}" for currentpath, folders, files in os.walk('.') for file in files]
+
+        except Exception as e:
+            raise Exception(f"listFilesInFileSystem() {e}")
+
+    # Recursively lists the contents of the archive file that is hosting the Python app
+    # Returns the contents as a list
+    @classmethod
+    def listFilesInArchive(cls, archiveName):
+        try:
+            with zipfile.ZipFile(archiveName) as zf:
+                # Get list of files names in zip
+                listOfiles = zf.namelist()
+                return listOfiles
+        except Exception as e:
+            raise Exception(f"listFilesInArchive() {archiveName}, {e}")
+
+
+
 
 class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
     # For JSON, use contentType='application/json'

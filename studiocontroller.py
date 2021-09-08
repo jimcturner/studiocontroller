@@ -96,6 +96,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             self.addEndpoint(getMappings, "api", self.renderApiIndexPage, contentType='text/html')
             self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
                              requiredKeys=["deviceAddress", "username", "commandString"])
+            self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
         except Exception as e:
             raise Exception(f"apiGETEndpoints(), {e}")
@@ -249,6 +250,32 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"sendCommandViaSSH() {e}")
 
+    # Recursively lists all files present in the containing zip archive (if it exists) and also the local folder
+    def browseFileSystem(self):
+        # Access parent object via server attribute
+        parent = self.server.parentObject
+        try:
+            archiveFileList = []
+            fileList = []
+            # Get a list of files contained within the pyz archive This may well fail, if the app is not being run from
+            # a zipped archive
+            try:
+                # Browse the pyz archive first (if possible).
+                archiveFileList = HTTPTools.listFilesInArchive(archiveName=parent.externalResourcesDict["pyzArchiveName"])
+            except Exception as e:
+                self.log_error(f"browseFileSystem.listFilesInArchive() {e}")
+            # Get a list of files from the current working folder and subfolders
+            fileList = HTTPTools.listFilesInFileSystem()
+            htmlContent = f"<h1> Local File system" \
+                   f"<table>" \
+                   f"{''.join([f'<tr><td><a href={file}>{file}</a></td></tr>' for file in fileList])}"\
+                   f"</table>"
+
+            htmlWrapped = self.htmlWrap(title="File browser", body=htmlContent, head='<base href="../"')
+            # return "\n".join(archiveFileList + fileList)
+            return htmlWrapped
+        except Exception as e:
+            raise Exception(f"browseFileSystem() {e}")
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
