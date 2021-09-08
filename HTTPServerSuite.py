@@ -6,6 +6,7 @@
 
 # Define a custom HTTPRequestHandler class to handle HTTP GET, POST requests
 import json
+import os
 import textwrap
 import threading
 import zipfile
@@ -150,7 +151,7 @@ class HTTPTools(object):
     # else (default) the imported file will be returned as a UTF8 string
     # Ascii can be returned if the function is called with returnStringType='ascii'
     @classmethod
-    def retrieveFileFromArchive(cls, archiveName, filepath, returnAsBytes=False, returnAsLines=False,
+    def retrieveFileFromArchive(cls, archiveName, filepath, returnAsBytes=True, returnAsLines=False,
                                 returnStringType='utf-8'):
         try:
             with zipfile.ZipFile(archiveName) as zf:
@@ -169,11 +170,11 @@ class HTTPTools(object):
 
     # Utility method to import a file from disk
     # if returnAsLines==True, the the imported file will have it's newlines stripped and each line returned as a list
-    # else (default) the imported file will be returned as a UTF8 string
+    # else (default) the imported file will be returned as-is
     @classmethod
     def importFileFromDisk(cls, filepath, returnAsLines=False):
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, 'rb') as f:
                 if returnAsLines:
                     # Return as a list of lines
                     return f.read().splitlines()
@@ -288,6 +289,28 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
         else:
             return simpleHtml
 
+    # Returns the correct HTTP mimetype for a given file extension
+    def getMimetype(self, path):
+        # Use the file extension to determine the content type, based on a list from here:-
+        # https://www.thoughtco.com/mime-types-by-content-type-3469108
+
+        # Specify the default mimetype if the submitted file extension is not recognised
+        defaultMimeType = 'text/html'
+        # Dict of possible mimetypes mapping the file extension to the mimetype
+        contentTypes = {
+            ".html": 'text/html',
+            ".jpeg": 'image/jpeg'
+        }
+        try:
+            # Extract the file extension from the path
+            filename, file_extension = os.path.splitext(path)
+            # Look up the content type for this file type
+            contentType = contentTypes[file_extension]
+            self.log_error(f"Using mimetype {contentType}")
+            return contentType
+        except Exception as e:
+            self.log_error(f"Failed to determine mimetype for {path}, using {defaultMimeType} instead")
+            return defaultMimeType
 
     # Override log_message() to return *nothing*, otherwise the HTTP server will continually log all HTTP requests
     # See here: https://stackoverflow.com/a/3389505
@@ -552,18 +575,17 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
                     archiveName = parent.externalResourcesDict['pyzArchiveName']
                     self.log_error(f"Attempt to load: {path} from {archiveName}")
                     try:
-                        htmlFile = HTTPTools.retrieveFileFromArchive(parent.externalResourcesDict["pyzArchiveName"], path)
+                        response = HTTPTools.retrieveFileFromArchive(parent.externalResourcesDict["pyzArchiveName"], path)
                     except Exception as e:
                         self.log_error(f"Can't extract {path} from archive {archiveName} {e}, trying local file system instead")
                         try:
-                            htmlFile = HTTPTools.importFileFromDisk(path)
+                            response = HTTPTools.importFileFromDisk(path)
 
                         except Exception as e:
                             raise Exception(f"Can't load {path} from filesystem {e}")
 
-                    # self.log_error(f"Import file: {path}, {htmlFile}")
-                    response = htmlFile.encode('utf-8')
-                    self._set_response(contentType='text/html')
+                    ### Next set the response header according to the file type (so that the browser knows what to do with the file
+                    self._set_response(contentType=self.getMimetype(path))
                 except Exception as e:
                     raise Exception(f"Didn't recognise {path} and import failed: {e}")
 
