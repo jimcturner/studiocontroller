@@ -326,7 +326,8 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
         contentTypes = {
             ".html": 'text/html',
             ".jpeg": 'image/jpeg',
-            ".ico": "image/x-icon"
+            ".ico": "image/x-icon",
+            ".txt": "text/plain"
         }
         try:
             # Extract the file extension from the path
