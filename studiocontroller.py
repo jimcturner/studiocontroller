@@ -3,6 +3,7 @@
 
 # A python script to provide a simple HTTP UI to remote control a studio Mikrotik router
 # James Turner 2021
+import configparser
 import datetime
 import os
 import shlex
@@ -85,6 +86,34 @@ class SSHController(object):
                 return None
         except Exception as e:
             raise Exception(f"SSHController.sendCommand() commandString: {commandString}, error: {e}")
+
+# A class of objects for managing/importing/exporting config files
+class ConfigFileManager(object):
+    # Creates a ConfigParser object, and optionally assigns defaultValues{} to the DEFAULT key
+    def __init__(self, defaultValues=None):
+        try:
+            self.config = configparser.ConfigParser()
+            if defaultValues is not None:
+                self.config['DEFAULT'] = defaultValues
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.__init() {e}")
+
+
+    # Writes the config object to disk
+    def writeToDisk(self, path):
+        try:
+            with open(path, 'w') as configfile:
+                self.config.write(configfile)
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.writeToDisk() {e}")
+
+    # Returns the instance of the config object
+    def get(self):
+        return self.config
+
+
+
+
 
 
 
