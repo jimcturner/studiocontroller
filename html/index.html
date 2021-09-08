@@ -1,41 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <!-- <head>  -->
+
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IBEOO Studio
-  Controller</title>
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/fontawesome.min.css">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IBEOO Studio
+    Controller</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.1/css/fontawesome.min.css">
 
-<script>
-  function myFunction(name, job) {
-    document.getElementById("status").innerHTML = "Welcome " + name + ", the " +
-      job + ".";
-  }
+  <script>
+    function myFunction(name, job) {
+      document.getElementById("status").innerHTML = "Welcome " + name + ", the " +
+        job + ".";
+    }
 
-  function sendCmd(targetAddr, username, commandString, destFieldID) {
-    // Construct the (relative) URL query where the data will be fetched from
-    // 'api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString
-    let url='api/sshcmd?deviceAddress=' + targetAddr + "&username=" + username + "&commandString=" + commandString
-    // let url = '<apiUrlSendCmdToMikrotik>' + commandString
-    document.getElementById(destFieldID).innerHTML = "Please Wait..."
-    // Fetch the response
-    fetch(url).then(response => response.text())
-    .then(data => document.getElementById(destFieldID).innerHTML = data);
+    // Error handler
+    function detectErrors(response) {
+      //Read the incoming response and check it for error. If it fails, handle it
+      // If successful (i.e no errors detected), just return the response to the
+      // next method in the chain
+      if (!response.ok) {
+        // HTML response contained errors,
+        // document.getElementById(destFieldID).innerHTML = "Error. See javascript console"
+        // And throw an Exception
+        throw Error(response.statusText);
+      }
+      return response;
 
-  }
-  // Create timed auto-polling of the ssh commands that will populate the statusFields
-  // defined in statusFields
-  function registerPollers(){
-    //<sshPollers>
-    
-  }
-  // Automarically call registerPollers() when the page has loaded
-  window.onload = registerPollers
-</script>
+    }
+
+    function logError(error, destFieldID) {
+      // Log the error to the console
+      console.log(error)
+      // Update the destFieldID that threw the error
+      document.getElementById(destFieldID).innerHTML = "Error. See javascript console"
+    }
+
+    // Get current time as HH:MM
+    function currentTime(){
+      return new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: "2-digit",
+        hour12: false
+      })
+
+    }
+    function sendCmd(targetAddr, username, commandString, destFieldID) {
+      // Construct the (relative) URL query where the data will be fetched from
+      // 'api/sshcmd?deviceAddress=192.168.3.2&username=kabulctrl&commandString=' + commandString
+      let url = 'api/sshcmd?deviceAddress=' + targetAddr + "&username=" + username + "&commandString=" + commandString
+      // let url = '<apiUrlSendCmdToMikrotik>' + commandString
+      // document.getElementById(destFieldID).innerHTML = "Please Wait..."
+      // // Get current time
+      // timeNow = new Date().toLocaleTimeString([], {
+      //   hour: '2-digit',
+      //   minute: "2-digit",
+      //   hour12: false
+      // })
+      // Update status bar
+      document.getElementById("cmd_sent").innerHTML = "(" + currentTime() + ")" + commandString + "==>" + username + "@" + targetAddr
+      // Clear status bar response field
+      document.getElementById("cmd_success").innerHTML = "Waiting.."
+      // Fetch the response. Catch any errors and log to the javascript console
+      // fetch(url).then(detectErrors).then(response => response.text())
+      // .then(data => document.getElementById(destFieldID).innerHTML = data).catch(error => console.log(error));
+
+      fetch(url).then(detectErrors).then(response => response.text())
+        .then(function (data) {
+          document.getElementById(destFieldID).innerHTML = data;
+          document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
+        }).catch(error => console.log(error));
+
+
+      // Update status bar response field
+      // document.getElementById("cmd_success").innerHTML = "(" + timeNow + ") OK"
+    }
+    // Create timed auto-polling of the ssh commands that will populate the statusFields
+    // defined in statusFields
+    function registerPollers(){
+      // Note: This method will be auto rendered when the page is created
+      // and the tag below will be detected by the renderer
+      // ##INSERT_POLLERS
+
+    }
+    // Automatically call registerPollers() when the page has loaded
+    window.onload = registerPollers
+  </script>
 
 </head>
 
@@ -53,6 +106,16 @@
   <!-- <button onclick="sendCmdToMikrotik(':put%20%22$[/system%20clock%20get%20time]%22')">Send Mikrotik Command</button> -->
   <routerSelectors></routerSelectors>
 
+  <!-- Define a status bar for the latest commands and statuses -->
+  <br>
+  <br>
+  <table border="1">
+    <tr>
+      <td>Current cmd status</td>
+      <td id="cmd_sent">&nbsp;</td>
+      <td id="cmd_success">&nbsp;</td>
+    </tr>
+  </table>
 
 </body>
 

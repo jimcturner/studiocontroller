@@ -150,13 +150,46 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # controllerDefinitions["statusFieldMappings"]. The resultant javascript code will be inserted into the
             # registerPollers() method (the skeleton of which is declared in html/index.html
             # Dynamically render the registerPollers() code for all status fields defined in controllerDefinitions["statusFieldMappings"]
-            registerPollersJS = f"\nwindow.setInterval(sendCmd, {controllerDefinitions['statusFieldMappings'][1]['polling_interval_ms']}, '{controllerDefinitions['deviceAddress']}', '{controllerDefinitions['deviceSshUsername']}', '{controllerDefinitions['statusFieldMappings'][1]['target_cmd_string']}', '{controllerDefinitions['statusFieldMappings'][1]['id']}');"
+            registerPollersJS = f"\nwindow.setInterval(sendCmd, " \
+                                f"{controllerDefinitions['statusFieldMappings'][1]['polling_interval_ms']}, " \
+                                f"'{controllerDefinitions['deviceAddress']}', " \
+                                f"'{controllerDefinitions['deviceSshUsername']}', " \
+                                f"'{controllerDefinitions['statusFieldMappings'][1]['target_cmd_string']}', " \
+                                f"'{controllerDefinitions['statusFieldMappings'][1]['id']}');"
+
+            # Iterates over controllerDefinitions['statusFieldMappings'] creating a line of javascript for each
+            # field listed. If the "polling_interval_ms" or "target_cmd_string" keys are None, the field will
+            # be ignored.
+            # Returns a list of strings, each of which is a line of valid javascript registering an
+            # autotimes Javascript function call
+            def renderPollertJS():
+                try:
+                    pollersJS = []
+                    for field in controllerDefinitions['statusFieldMappings']:
+                        # Check to see if this field is to be registered as one that will auto-refresh
+                        if field["target_cmd_string"] is not None and field["polling_interval_ms"] is not None:
+                            # This is an auto-refreshing field
+                            pollersJS.append(f"\nwindow.setInterval(sendCmd, " \
+                                f"{field['polling_interval_ms']}, " \
+                                f"'{controllerDefinitions['deviceAddress']}', " \
+                                f"'{controllerDefinitions['deviceSshUsername']}', " \
+                                f"'{field['target_cmd_string']}', " \
+                                f"'{field['id']}');")
+                    # Return the list of javascript strings (one for each of the (not-being-ignored) status fields)
+                    return pollersJS
+                except Exception as e:
+                    raise Exception(f"renderPollertJS() {e}")
+
+
+            # Render a list of javascript window.setInterval() method calls for each of the statusFieldMappings
+            registerPollersJS = "\n".join(renderPollertJS())
+
             # Insert the javascript method code into the html template
-            htmlFile = HTTPTools.insertAfter(htmlFile, "registerPollers(){", registerPollersJS)
+            htmlFile = HTTPTools.insertAfter(htmlFile, "##INSERT_POLLERS", registerPollersJS)
 
             # Create the status fields defined in controllerDefinitions["statusFieldMappings"] (as an HTML table)
-            statusFieldHTML = """<table border="1"> """ + "\n".join([
-                f"""<tr><td>{field["label"]}</td><td id="{field["id"]}">&nbsp;</td></tr>"""
+            statusFieldHTML = '<table border="1"> ' + "\n".join([
+                f"""<tr><td>{field["label"]}</td><td style="min-width:200px" id="{field["id"]}">&nbsp;</td></tr>"""
                 for field in controllerDefinitions["statusFieldMappings"]
             ]) + "</table>"
             # Insert the status fields into the html
@@ -410,6 +443,8 @@ def main():
 
     # statusFieldMappings contains a list of labelled status fields that will be populated automatically by running the
     # ssh command string contained in target_cmd_string. Polling will occur at a period set by polling_interval_ms
+    # If "target_cmd_string" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
+    # to auto poll (but these field id's will still have been created so can be modified on the page)"
     sharedObjects["controllerDefinitions"] = {
         "deviceAddress": "192.168.3.2",
         "deviceSshUsername": "kabulctrl",
@@ -438,15 +473,15 @@ def main():
         "statusFieldMappings": [
             {
                 "label": "Current cmd status",
-                "target_cmd_string": "system script run get_identity",
+                "target_cmd_string": None,
                 "id": "cmd_response",
-                "polling_interval_ms": 2000
+                "polling_interval_ms": None
             },
             {
                 "label": "Current Router Clock",
                 "target_cmd_string": ':put "$[/system clock get time]"',
                 "id": "uTik_timeOfDay",
-                "polling_interval_ms": 2000
+                "polling_interval_ms": 5000
             }
         ]
     }
