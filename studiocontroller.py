@@ -201,7 +201,7 @@ class ConfigFileManager(object):
                 # Determine whether mandatory keys are present
                 keysMissing = set(self.mandatoryKeysList) - keysPresented
                 # Determine whether there were any unexpected additionsal keys
-                unexpectedKeys =  keysPresented - set(self.mandatoryKeysList)
+                unexpectedKeys = keysPresented - set(self.mandatoryKeysList)
                 return list(keysMissing), list(unexpectedKeys), list(keysPresented)
             else:
                 return [], [], keysPresented
@@ -677,7 +677,7 @@ def main():
     # Create a dict of shared object to be shared between all the threads
     sharedObjects = {}
 
-    # Predefine some button/(GPI) and Mikrotik script definitions definitions
+    # Predefine some sample button/(GPI) and Mikrotik script definitions definitions
 
     # buttonScriptMappings contains a list of buttons, their corresponding ssh command strings and the id of the field
     # that will be populated with the response of that command
@@ -689,52 +689,52 @@ def main():
     # ssh command string contained in target_cmd_string. Polling will occur at a period set by polling_interval_ms
     # If "target_cmd_string" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
     # to auto poll (but these field id's will still have been created so can be modified on the page)"
-    sharedObjects["controllerDefinitions"] = {
-        "deviceAddress": "192.168.3.2",
-        "deviceSshUsername": "kabulctrl",
-        "buttonScriptMappings": [
-            {
-                "label": "Route via 4G",
-                "target_cmd_string": "system script run route_via_4g",
-                "response_field_id": None
-            },
-            {
-                "label": "Route via adhoc WiFi",
-                "target_cmd_string": "system script run route_via_adhoc_wifi",
-                "response_field_id": None
-            },
-            {
-                "label": "Route via adhoc cabled connection",
-                "target_cmd_string": "system script run route_via_adhoc_cable",
-                "response_field_id": None
-            },
-            {
-                "label": "Get Router Identity",
-                "target_cmd_string": "system script run get_identity",
-                "response_field_id": "cmd_response"
-            }
-        ],
-        "statusFieldMappings": [
-            # {
-            #     "label": "Current cmd status",
-            #     "target_cmd_string": None,
-            #     "id": "cmd_response",
-            #     "polling_interval_ms": None
-            # },
-            # {
-            #     "label": "Current Router Clock",
-            #     "target_cmd_string": ':put "$[/system clock get time]"',
-            #     "id": "uTik_timeOfDay",
-            #     "polling_interval_ms": 5000
-            # },
-            {
-                "label": "Current Routing status",
-                "target_cmd_string": 'system script run get_current_routing',
-                "id": "uTik_current_route",
-                "polling_interval_ms": 5000
-            }
-        ]
-    }
+    # sharedObjects["controllerDefinitions"] = {
+    #     "deviceAddress": "192.168.3.2",
+    #     "deviceSshUsername": "kabulctrl",
+    #     "buttonScriptMappings": [
+    #         {
+    #             "label": "Route via 4G",
+    #             "target_cmd_string": "system script run route_via_4g",
+    #             "response_field_id": None
+    #         },
+    #         {
+    #             "label": "Route via adhoc WiFi",
+    #             "target_cmd_string": "system script run route_via_adhoc_wifi",
+    #             "response_field_id": None
+    #         },
+    #         {
+    #             "label": "Route via adhoc cabled connection",
+    #             "target_cmd_string": "system script run route_via_adhoc_cable",
+    #             "response_field_id": None
+    #         },
+    #         {
+    #             "label": "Get Router Identity",
+    #             "target_cmd_string": "system script run get_identity",
+    #             "response_field_id": "cmd_response"
+    #         }
+    #     ],
+    #     "statusFieldMappings": [
+    #         # {
+    #         #     "label": "Current cmd status",
+    #         #     "target_cmd_string": None,
+    #         #     "id": "cmd_response",
+    #         #     "polling_interval_ms": None
+    #         # },
+    #         # {
+    #         #     "label": "Current Router Clock",
+    #         #     "target_cmd_string": ':put "$[/system clock get time]"',
+    #         #     "id": "uTik_timeOfDay",
+    #         #     "polling_interval_ms": 5000
+    #         # },
+    #         {
+    #             "label": "Current Routing status",
+    #             "target_cmd_string": 'system script run get_current_routing',
+    #             "id": "uTik_current_route",
+    #             "polling_interval_ms": 5000
+    #         }
+    #     ]
+    # }
 
     #### Pre-render some tables that can be displayed in the help-text
     #### The first and second columns of the help tables are also used to seed getopt in order to parse the
@@ -745,13 +745,18 @@ def main():
     columnMaxWidth = AsciiTable([["x:", "python-interpreter-path= ", "z"]]).column_max_width(2)
 
     # Specify the mandatory switches/long options that can (or should be) passed. Helptext will be used
+    # element 1: The switch (eg -c)
+    # element 2: The long option version of the switch (e.g --config-file)
+    # element 3: The helptext for that option
+    # element 4: Denotes whether this switch takes a parameter eg -c [filename] (":" denotes that it takes a parameter,
+    #                                                                              "" means that it doesn't)
     mandatorySwitches = [
         ["-c", "--config-file", '\n'.join(textwrap.wrap(
             f"The config file containing the mappings between the web gui buttons and the "
-            f"corresponding Mikrotik scripts that should be run when they are pressed", columnMaxWidth))]
+            f"corresponding Mikrotik scripts that should be run when they are pressed", columnMaxWidth)), ":"]
     ]
     # Specify any optional switches
-    optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help"))],
+    optionalSwitches = [["-h", "--help", '\n'.join(textwrap.wrap(f"Show help")), ""],
                         ["-p", "--public-http", '\n'.join(textwrap.wrap(f"Specifies a user selected ip address:port "
                                                                         f"combination, or just a port that the HTTP "
                                                                         f"server will listen on. By default, the web "
@@ -759,7 +764,19 @@ def main():
                                                                         f"{httpServerAddr[0]}:"
                                                                         f"{httpServerAddr[1]}. "
                                                                         f"Examples are: -p 192.168.3.50:10000 or "
-                                                                        f"-p 10000. Port values need to be > 1024"))]]
+                                                                        f"-p 10000. Port values need to be > 1024")), ":"],
+                        ["-g", "--generate-dummy-config",
+                         '\n'.join(textwrap.wrap(f"Generates a dummy config file that defines the ip address of the "
+                                                 f"Mikrotik router (that controls the internet routing of the studio), "
+                                                 f"the buttons that "
+                                                 f"will be displayed on the web GUI, and the Mikrotik scripts "
+                                                 f"that will be triggered when those buttons are pressed. See"
+                                                 f"help text embedded in the help file for more details")), ""],
+                        ["-i", "--make-install-scripts",
+                         '\n'.join(textwrap.wrap(f"Will automatically generate the "
+                                                 f"bash scripts required to install studiocontroller (so that "
+                                                 f"it will auto-start on boot)")), ""]
+                        ]
 
     # Create an ascii table of mandatory switches that will be displayed as part of the help page
     table = AsciiTable(mandatorySwitches)
@@ -775,10 +792,12 @@ def main():
 
     # Create an option string (from the first column of switches[] that can be passed to getopt
     # Note the ':' suffix (denotes to getopt that this switch will be followed by a value)
-    getoptSwitches = "".join([f"{str(x[0]).replace('-', '')}:" for x in mandatorySwitches + optionalSwitches])
+    # The : suffix (or not) is pulled from the mandatorySwitches/optionalSwitches fourth list element
+    getoptSwitches = "".join([f"{str(x[0]).replace('-', '')}{x[3]}" for x in mandatorySwitches + optionalSwitches])
     # Create a long options list of strings (from the second column of switches[] that can be passed to getopt
     # Note the '=' suffix (denotes to getopt that this switch will be followed by a value)
     getoptLongOptions = [f"{str(x[1]).replace('--', '')}=" for x in mandatorySwitches + optionalSwitches]
+    # print (f"getoptSwitches: {getoptSwitches}\n getoptLongOptions: {getoptLongOptions}")
 
     # Define the helptext that will be displayed
     helpText = textwrap.dedent(f'''\
@@ -795,7 +814,7 @@ Arguments supplied: {argv}
 
     try:
         # Get the command line args (note: the first element as it only contains the name of this script)
-        if len(sys.argv) < 1:
+        if len(sys.argv) < 2:
             print(f"ERR: ** No parameters supplied **\n\n"
                   f"{helpText}")
             exit(1)
@@ -825,6 +844,21 @@ Arguments supplied: {argv}
                         configFileName = arg
                     else:
                         raise Exception(f"Supplied config-file doesn't exist: ({arg}).")
+
+                if opt in("-g", "--generate-dummy-config"):
+                    try:
+                        # Copy and save the controllerDefinitions_template.json file
+                        # Make use of HTTPTools.importFile() because it can import from an archive OR the file system
+                        templateFile = HTTPTools.importFile("controllerDefinitions_template.json")
+                        # Write the file back to disk
+                        path = f"controllerDefinitions_template_{datetime.datetime.now().strftime('%Y_%m_%d-%H_%M')}.json"
+                        with open(path, 'w') as f:
+                            f.write(templateFile.decode('utf-8'))
+                        print(f"Generated a template configuration file: {path}\n"
+                              f"Please edit this file.")
+                        exit(0)
+                    except Exception as e:
+                        raise Exception(f"Failed to generate dummy config file {e}")
 
                 if opt in ("-p", "--public-http"):
                     # Set a user-specified public HTTP port or address:port combination
@@ -870,6 +904,28 @@ Arguments supplied: {argv}
         exit(1)
 
     ####### Main code starts
+    if configFileName is None:
+        print(f"""
+Error: studiocontroller started without a config file. 
+Please run again with the -h or --help switches.
+
+Hint. Run with the -g or --generate-dummy-config switches to
+generate a template file that can be edited
+""")
+        exit(1)
+
+    ## Attempt to import the config file specified in the -c switch
+    try:
+        # Create an ConfigFileManager object
+        config = ConfigFileManager()
+        # Load in the config file
+        config = config.load(configFileName)
+        # Copy the config dictionary into sharedObjects[]
+        sharedObjects["controllerDefinitions"] = dict(config.config)
+    except Exception as e:
+        print(f"Failed to import config file {configFileName} {e}")
+        exit(1)
+
     # # Create a threading.Event object that will be monitored by all threads NOTE USED YET
     # shutdownFlag = threading.Event
     # Register signal handlers
