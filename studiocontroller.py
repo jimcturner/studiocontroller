@@ -849,7 +849,8 @@ Arguments supplied: {argv}
                     try:
                         # Copy and save the controllerDefinitions_template.json file
                         # Make use of HTTPTools.importFile() because it can import from an archive OR the file system
-                        templateFile = HTTPTools.importFile("controllerDefinitions_template.json")
+                        templateFile = HTTPTools.importFile("controllerDefinitions_template.json",
+                                                            archiveName=sharedObjects["pyzArchiveName"])
                         # Write the file back to disk
                         path = f"controllerDefinitions_template_{datetime.datetime.now().strftime('%Y_%m_%d-%H_%M')}.json"
                         with open(path, 'w') as f:
