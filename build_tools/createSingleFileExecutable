@@ -12,7 +12,7 @@ dependencies=(
 	validator_collection==1.4.2
 	)
 
-cd ..
+
 # Temporary folder where pip will collect the dependencies. The name of this folder will determine the name of the file executable archive
 targetSubFolder="tempDownloadsFolder"
 
