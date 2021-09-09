@@ -457,9 +457,9 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # Wrap the tables in an html body
             # NOTE: This endpoint is accessed via the /debug endpoint. This means that, by defsult all the hrefs
             # will start with /debug/filexxx
-            # This is no good. We need to re-point the 'base url reference up one level to the root'
-            # we do this by inserting the <base href="../"> tag within the html <head></head> tags'
-            htmlWrapped = self.htmlWrap(title="File browser", body=htmlContent, head='<base href="../">')
+            # This is no good. We need to re-point the 'base url reference to the root'
+            # we do this by inserting the <base href="/"> tag within the html <head></head> tags'
+            htmlWrapped = self.htmlWrap(title="File browser", body=htmlContent, head='<base href="/">')
             # return "\n".join(archiveFileList + fileList)
             return htmlWrapped
         except Exception as e:
@@ -913,7 +913,8 @@ Please run again with the -h or --help switches.
 Hint. Run with the -g or --generate-dummy-config switches to
 generate a template file that can be edited
 """)
-        exit(1)
+        # exit(1)
+        pass
 
     ## Attempt to import the config file specified in the -c switch
     try:
@@ -925,7 +926,8 @@ generate a template file that can be edited
         sharedObjects["controllerDefinitions"] = dict(config.config)
     except Exception as e:
         print(f"Failed to import config file {configFileName} {e}")
-        exit(1)
+        # exit(1)
+        pass
 
     # # Create a threading.Event object that will be monitored by all threads NOTE USED YET
     # shutdownFlag = threading.Event
