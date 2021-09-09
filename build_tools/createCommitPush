@@ -4,8 +4,9 @@
 # It optionally takes a remote commuit label as an argument
 # James Turner 31/8/21
 
+
 # Create a single folder executable (run existing script)
-./createSingleFileExecutable
+build_tools/createSingleFileExecutable
 
 # Extract the supplied first argument (if supplied) to be used as a commit label
 #commitLabel='"'${1:-"Commit changes to remote"}'"'

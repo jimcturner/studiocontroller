@@ -678,13 +678,13 @@ def main():
     sharedObjects = {}
 
     # Predefine some sample button/(GPI) and Mikrotik script definitions definitions
-
+    #
     # buttonScriptMappings contains a list of buttons, their corresponding ssh command strings and the id of the field
     # that will be populated with the response of that command
     # "label": The label that will be diaplayed on the html button
     # "target_cmd_string": The command string that will be sent to the device (via SSH)
     # "response_field_id": Optional javascript html dom ID where the result/output of the command will be displayed
-
+    #
     # statusFieldMappings contains a list of labelled status fields that will be populated automatically by running the
     # ssh command string contained in target_cmd_string. Polling will occur at a period set by polling_interval_ms
     # If "target_cmd_string" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
@@ -849,7 +849,7 @@ Arguments supplied: {argv}
                     try:
                         # Copy and save the controllerDefinitions_template.json file
                         # Make use of HTTPTools.importFile() because it can import from an archive OR the file system
-                        templateFile = HTTPTools.importFile("controllerDefinitions_template.json",
+                        templateFile = HTTPTools.importFile("templates/controllerDefinitions_template.json",
                                                             archiveName=sharedObjects["pyzArchiveName"])
                         # Write the file back to disk
                         path = f"controllerDefinitions_template_{datetime.datetime.now().strftime('%Y_%m_%d-%H_%M')}.json"

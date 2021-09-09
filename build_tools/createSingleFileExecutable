@@ -12,6 +12,7 @@ dependencies=(
 	validator_collection==1.4.2
 	)
 
+cd ..
 # Temporary folder where pip will collect the dependencies. The name of this folder will determine the name of the file executable archive
 targetSubFolder="tempDownloadsFolder"
 
@@ -32,7 +33,7 @@ echo "downloading dependancies into new subfolder $targetSubFolder"
 # python3 -m pip install  ${dependencies[@]} --target $targetSubFolder
 
 echo 'Copying *.py (program code) and html folder into target subfolder $targetSubFolder for parcelling up with dependencies'
-cp -r *.py html *.ico *.json $targetSubFolder
+cp -r *.py html *.ico build_tools scripts templates $targetSubFolder
 
 echo "Creating $targetSubFolder.pyz file from contents of $targetSubFolder" 
 python3 -m zipapp $targetSubFolder -c -p "/usr/bin/env python" -m "$zipappMainScript:main" -o "$zipappMainScript.pyz"
