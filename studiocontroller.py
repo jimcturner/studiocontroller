@@ -5,6 +5,7 @@
 # James Turner 2021
 import configparser
 import datetime
+import json
 import os
 import shlex
 import signal
@@ -17,6 +18,7 @@ import zipfile
 import getopt
 from random import randint
 
+import validator_collection
 from validator_collection import validators, checkers, errors
 import textwrap
 from terminaltables import AsciiTable
@@ -88,33 +90,180 @@ class SSHController(object):
             raise Exception(f"SSHController.sendCommand() commandString: {commandString}, error: {e}")
 
 # A class of objects for managing/importing/exporting config files
+# The encode()/decode() methods currently use the built-in json libraries, but these could be
+# overridden if a cleaner better method of encoding nested config data can be found
 class ConfigFileManager(object):
-    # Creates a ConfigParser object, and optionally assigns defaultValues{} to the DEFAULT key
-    def __init__(self, defaultValues=None):
+    # Creates a config dict object, and optionally assigns initialKeysValues{}
+    # path is the filepath/filename of the config file (where it will be loaded saved/from
+    # defaultValues is a dict of optional default values that will be copied into the config object
+    # headerText is descriptive text that will be automatically prepended to the config file
+    # Note: Comments lines start with a #. All subsequent data on that line will be ignored
+    # Since ConfigFileManager.config is a regular dictionary, keys can be added/removed at will
+    # by directly modifying the config instance variable (a dictionary)
+    def __init__(self, path=None, initialKeysValues:dict= {}, headerText="", headerTextWrapWidth=78):
         try:
-            self.config = configparser.ConfigParser()
-            if defaultValues is not None:
-                self.config['DEFAULT'] = defaultValues
+            # Create dict to contain the config data
+            self.config = {}
+            # A list that will be populated by the 'mandatory keys' that need to be present in any loaded config file
+            # This list will be derived from defaultValues{} (if supplied)
+            self.mandatoryKeysList = []
+
+            self.path = path
+            self.initialKeysValues = {}
+
+            # Copy the default values (if provided) into the config dict
+            if initialKeysValues is not None:
+                self.initialKeysValues = dict(initialKeysValues)
+                self.config = dict(initialKeysValues)
+                # Extract a list of keys from defaultValues. This can be used to determine that an imported config
+                # file contains all the required dict keys
+                self.mandatoryKeysList = list(initialKeysValues.keys())
+
+            # If a path has been supplied, is it valid?
+            if self.path is not None:
+                if not validator_collection.is_pathlike(path):
+                    raise Exception(f"invalid path {path}")
+
+            # Wrap the incoming header text onto seperate lines, and preface each line with a # (the comment character)
+            self.headerText = "\n".join([f"# {line}" for line in textwrap.wrap(headerText, width=headerTextWrapWidth)]) + "\n"
         except Exception as e:
             raise Exception(f"ConfigFileManager.__init() {e}")
 
+    # Sets the default save/filename for the config file
+    def setPath(self, path):
+        try:
+            if validator_collection.is_pathlike(path):
+                self.path = path
+            else:
+                raise Exception(f"invalid path {path}")
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.setPath() {e}")
+
+    # Returns the current path/filename
+    def getPath(self):
+        return self.path
+
+    # Uses json.dumps() to serialise the input (config dict) nicely as an indented string
+    # Note, this method could be overridden, if a better means that json is found, to encode the data
+    def encode(self, input):
+        try:
+            return json.dumps(input, indent=True, sort_keys=False)
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.encode() {input}, {e}")
+
+    # Uses json.loads() to recreate the config dict nicely as an indented string
+    # Note, this method could be overridden, if a better means that json is found, to decode the data
+    def decode(self, input):
+        try:
+            return json.loads(input)
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.decode() {input}, {e}")
+
+
 
     # Writes the config object to disk
-    def writeToDisk(self, path):
+    def save(self, path=None, creator:str=""):
         try:
-            with open(path, 'w') as configfile:
-                self.config.write(configfile)
+            # Writes self.config to disk as a string encoded json dict
+            # Pass the config dict to the encoder
+            printableConfigAsDict = self.encode(self.config)
+
+            # Take the path/filename as supplied or else use the path stored in self.path
+            path = path if path is not None else self.path
+
+            if path is None:
+                raise Exception("No filename/path set")
+
+            # Create a title line with the date and (if creator is set), the label of the person/thing tht created the file
+            title = f"# {path} Generated at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} " \
+                    f"{f'created by {creator}' if creator != '' else ''}\n"
+            # Write the file to disk (with headertext)
+            # If path has been specified, this will be used instead of the instance variable
+
+            with open(path, 'w') as f:
+                f.write(title + self.headerText + printableConfigAsDict)
         except Exception as e:
-            raise Exception(f"ConfigFileManager.writeToDisk() {e}")
+            raise Exception(f"ConfigFileManager.save() {e}")
 
-    # Returns the instance of the config object
-    def get(self):
-        return self.config
+    def getMandatoryKeysList(self):
+        return self.mandatoryKeysList
+
+    # Verifies that all the dict keys originally defined in self.mandatoryKeysList are present in self.config
+    # Returns a tuple of keysMissing, unexpectedKeys (keys that were presented but in addition to those in
+    # mandatory keys and keysPresented
+    # NOTE: THIS WON't CHECK NESTED STRUCTURES - ONLY THE TOP LEVEL KEYS
+    def checkAllKeysArePresent(self, configToBeChecked:dict):
+        try:
+            # Confirm that some mandatory keys were specified
+            # Create a set containing all the keys present in configToBeChecked{}
+            keysPresented = set(configToBeChecked.keys())
+            if len(self.mandatoryKeysList) > 0:
+                # Determine whether mandatory keys are present
+                keysMissing = set(self.mandatoryKeysList) - keysPresented
+                # Determine whether there were any unexpected additionsal keys
+                unexpectedKeys =  keysPresented - set(self.mandatoryKeysList)
+                return list(keysMissing), list(unexpectedKeys), list(keysPresented)
+            else:
+                return [], [], keysPresented
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.checkAllKeysArePresent() {e}")
 
 
 
+    # Imports a json dict object from a file, or raises an Exception on fail
+    # returns the config object (a dictionary)
+    # If path is set, this will override self.path
+    # If replaceExistingConfig is True, the config in memory will be overwritten, if not the old config will be preserved
+    # This allows you to verify an imported config is correct, before overwriting the one in memory
+    # If self.path has not been set yet, this will raise an Exception
+    # If checkAllKeysPresent is set, the imported config file will be validated to make sure that it contains
+    # all the keys specified in mandatoryKeys[]. If they are not, it will raise an Exception
+    def load(self, path=None, checkAllKeysPresent=True, replaceExistingConfig=True):
+        try:
+            if path is None and self.path is None:
+                raise Exception("path/filename not set")
 
+            # If no path was specified, use the path/filename stored in self.path
+            if path is None:
+                path = self.path
 
+            # Open file for reading (using 'with' means that the OS will take care of closing it)
+            with open(path, 'r') as fh:
+                # Read the file
+                tempListOfLines = []
+                # Strip out the comment lines (those staritng with a # character)
+                # Create a list from each line of the file, ignoring those that start with a # (comments)
+                for line in fh:
+                    # when you see a # character; just ignore the rest of the line
+                    line = line.partition('#')[0]
+                    # Remove any trailing whitespace
+                    line = line.rstrip()
+                    # if line has any content, append it to configList
+                    if len(line) > 0:
+                        tempListOfLines.append(line)
+                # Now rejoin the lines back together
+                unCommentedRawFile = "".join(tempListOfLines)
+                # Attempt to convert it from a (json?) encoded string back to a dict
+                try:
+                    importedConfig = self.decode(unCommentedRawFile)
+                except Exception as e:
+                    raise Exception(f"decode() {e}")
+
+                # If key checking is enabled, validate the incoming contents. Are all the expected dict keys present?
+                if checkAllKeysPresent is True:
+                    # Compare the expected keys with the provided keys
+                    missingKeys, unexpectedKeys, allKeys = self.checkAllKeysArePresent(importedConfig)
+                    # If keys are missing, raise an Exception
+                    if len(missingKeys) > 0:
+                        raise Exception(f"Missing keys: {missingKeys}")
+
+                if replaceExistingConfig:
+                    # Overwrite the existing config with the imported file
+                    self.config = dict(importedConfig)
+
+                return importedConfig
+        except Exception as e:
+            raise Exception(f"ConfigFileManager.load() {e}")
 
 
 class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
