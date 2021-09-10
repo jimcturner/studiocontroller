@@ -936,9 +936,9 @@ generate a template file that can be edited
         # Create an ConfigFileManager object
         config = ConfigFileManager()
         # Load in the config file
-        config = config.load(configFileName)
+        configAsDict = config.load(configFileName)
         # Copy the config dictionary into sharedObjects[]
-        sharedObjects["controllerDefinitions"] = dict(config.config)
+        sharedObjects["controllerDefinitions"] = dict(configAsDict)
     except Exception as e:
         print(f"Failed to import config file {configFileName}\n---------\n {e}")
         exit(1)

@@ -6,8 +6,12 @@
 # It is a dictionary of keys and values encoded in json format (see here: https://en.wikipedia.org/wiki/JSON)
 # which is a list of comma seperated 'keys' with their values, all enclosed in curly brackets
 # The keys themselves should be in double quotes, seperated from the values by a colon
-# Values that a strings should also be in quotes. Numeric values do not need quotes
+# Values that a strings should also be in double quotes. Numeric values do not need quotes
 # To denote 'no value', use the word null
+# Note: strings containing double quotes within the string itseld can be handled by prefacing the double quote with a
+# '\' character. So for instance, the Mikrotik command :put "$[/system clock get time]" when written into json would be
+# ":put \"$[/system clock get time]\"",
+
 #
 # Values can themselves also be 'nested' dictionaries of key: value pairs (once again, comma seperated, and enclosed
 # in curly brackets. So, for instance the buttons and user fields
@@ -48,6 +52,20 @@
 #                       This permits the automatic retrieval of a value at a preset interval. If "target_cmd_string" is
 #                        not used (i.e null) this should also be set to null
 
+# Example statusFieldMappings definitions
+# {
+#               "label": "Current cmd status",
+#                 "target_cmd_string": null,
+#                 "id": "cmd_response",
+#                 "polling_interval_ms": null
+#             },
+#             {
+#                 "label": "Current Router Clock",
+#                 "target_cmd_string": ":put \"$[/system clock get time]\"",
+#                 "id": "uTik_timeOfDay",
+#                 "polling_interval_ms": 5000
+#             },
+
 {
         "deviceAddress": "192.168.3.2",
         "deviceSshUsername": "kabulctrl",
@@ -74,21 +92,9 @@
             }
         ],
         "statusFieldMappings": [
-            # {
-            #     "label": "Current cmd status",
-            #     "target_cmd_string": null,
-            #     "id": "cmd_response",
-            #     "polling_interval_ms": null
-            # },
-            # {
-            #     "label": "Current Router Clock",
-            #     "target_cmd_string": ':put "$[/system clock get time]"',
-            #     "id": "uTik_timeOfDay",
-            #     "polling_interval_ms": 5000
-            # },
             {
                 "label": "Current Routing status",
-                "target_cmd_string": 'system script run get_current_routing',
+                "target_cmd_string": "system script run get_current_routing",
                 "id": "uTik_current_route",
                 "polling_interval_ms": 5000
             }
