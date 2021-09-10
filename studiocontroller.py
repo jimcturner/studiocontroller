@@ -437,6 +437,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             fileList = []
             # Get a list of files contained within the pyz archive This may well fail, if the app is not being run from
             # a zipped archive
+            archiveName = ""
             try:
                 # Browse the pyz archive first (if possible).
                 archiveName = parent.externalResourcesDict["pyzArchiveName"]
