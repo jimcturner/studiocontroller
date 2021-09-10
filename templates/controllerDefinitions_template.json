@@ -1,4 +1,4 @@
-# This is a template file to define the behaviur and look of the studiocontroller webgui.
+# This is a template file to define the behaviour and look of the studiocontroller webgui.
 # It contains some sample buttons/(GPI), the Mikrotik comands (scriptps) that will be called
 # when that button is pressed, and also the user defined status fields that relay information back to the user
 # that will be displayed on the studiocontroller webgui
@@ -19,7 +19,7 @@
 # "deviceAddress": The ip address of the Mikrotik router
 # "buttonScriptMappings": A dictionary of keys: values that define a button on the web page, and what the button does
 # "statusFieldMappings": A dictionary of keys: values that define a status field on the web page, and where the field
-                        # gets its data from
+#                          gets its data from
 #
 # buttonScriptMappings
 # --------------------
@@ -46,7 +46,7 @@
 #       The device response to the command string in "target_cmd_string" will be displayed in this field
 # "polling_interval_ms" The period in (in mS) that the command string defined in "target_cmd_string" will be sent
 #                       This permits the automatic retrieval of a value at a preset interval. If "target_cmd_string" is
-                        not used (i.e null) this should also be set to null
+#                        not used (i.e null) this should also be set to null
 
 {
         "deviceAddress": "192.168.3.2",

@@ -156,8 +156,20 @@ class ConfigFileManager(object):
     def decode(self, input):
         try:
             return json.loads(input)
+        except json.JSONDecodeError as err:
+            # Improved json error message showing exactly where the parsing failed.
+            # Grabbed from here: https://stackoverflow.com/a/35150895
+            # grab a reasonable section, say 40 characters.
+            start, stop = max(0, err.pos - 20), err.pos + 20
+            snippet = err.doc[start:stop]
+            # Construct a useful error message showing where the json import failed
+            # This will display the portion where the import failed, and highlight it with a '^' character
+            errStr = str(err) + "\n" + ('... ' if start else '') + snippet + (' ...' if stop < len(err.doc) else '') + \
+                     "\n" + ('^'.rjust(21 if not start else 25))
+            raise Exception(errStr)
+
         except Exception as e:
-            raise Exception(f"ConfigFileManager.decode() {input}, {e}")
+            raise Exception(f"ConfigFileManager.decode(), {e}")
 
 
 
@@ -247,7 +259,9 @@ class ConfigFileManager(object):
                 try:
                     importedConfig = self.decode(unCommentedRawFile)
                 except Exception as e:
-                    raise Exception(f"decode() {e}")
+                    # Render a prettier version of tempListOfLines (with newlines)
+                    commentsStrippedWithLinebreaks = "\n".join(tempListOfLines)
+                    raise Exception(f"json parsing error: \n {e}")
 
                 # If key checking is enabled, validate the incoming contents. Are all the expected dict keys present?
                 if checkAllKeysPresent is True:
@@ -914,7 +928,7 @@ Please run again with the -h or --help switches.
 Hint. Run with the -g or --generate-dummy-config switches to
 generate a template file that can be edited
 """)
-        # exit(1)
+        exit(1)
         pass
 
     ## Attempt to import the config file specified in the -c switch
@@ -926,8 +940,8 @@ generate a template file that can be edited
         # Copy the config dictionary into sharedObjects[]
         sharedObjects["controllerDefinitions"] = dict(config.config)
     except Exception as e:
-        print(f"Failed to import config file {configFileName} {e}")
-        # exit(1)
+        print(f"Failed to import config file {configFileName}\n---------\n {e}")
+        exit(1)
         pass
 
     # # Create a threading.Event object that will be monitored by all threads NOTE USED YET
