@@ -140,6 +140,8 @@ class SSHController(object):
     # sendCommand(':put "$[/system clock get time], $[/system clock get date]";/tool traceroute address=8.8.8.8 count=1')
     # Note: Because the Mikrotik command itself contains double quotes, single quotes were used ot wrap the string passed
     # to sendCommand()
+    # NOTE: This method is a bit temparemental. If you keep sending individial requeests to a Mikrotik at too high
+    # a rate, the Mikrotik wil get upset and start timing out
     def sendCommandViaOS(self, commandString, timeout=5, onSuccess=None, onFailure=None):
         try:
             # Create the command string that would be written on the command line
