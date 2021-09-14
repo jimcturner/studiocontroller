@@ -50,12 +50,37 @@
     }
     // Sends a command to a device via SSH
     // If destFieldID is set to 'undefined', the output will be ignored
-    function sendCmd(targetAddr, username, commandString, destFieldID) {
+    // function sendCmd(targetAddr, username, commandString, destFieldID) {
+    //   // Construct the (relative) URL query where the data will be fetched from
+    //   let url = 'api/sshcmd?deviceAddress=' + targetAddr + "&username=" + username + "&commandString=" + commandString
+    //
+    //   // Update status bar
+    //   document.getElementById("cmd_sent").innerHTML = "(" + currentTime() + ")" + commandString + "==>" + username + "@" + targetAddr
+    //   // Clear status bar response field
+    //   document.getElementById("cmd_success").innerHTML = "Waiting.."
+    //   // Fetch the response. Catch any errors and log to the javascript console
+    //   fetch(url).then(detectErrors).then(response => response.text())
+    //     .then(function(data) {
+    //       // Update the target destFieldID (only if specified, otherwise write to the javascript console)
+    //       if (destFieldID == undefined){
+    //           console.log("Request: " + url + ", Response: " + data)
+    //       }
+    //       else {
+    //         document.getElementById(destFieldID).innerHTML = data;
+    //       }
+    //       // Update the status bar
+    //       document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
+    //     }).catch(error => console.log(error));
+    //
+    // }
+    // Sends a command to the Mikrotik router via SSH
+    // If destFieldID is set to 'undefined', the output will be ignored
+    function sendCmdToMikrotik(commandString, destFieldID) {
       // Construct the (relative) URL query where the data will be fetched from
-      let url = 'api/sshcmd?deviceAddress=' + targetAddr + "&username=" + username + "&commandString=" + commandString
+      let url = 'api/sshcmd?commandString=' + commandString
 
       // Update status bar
-      document.getElementById("cmd_sent").innerHTML = "(" + currentTime() + ")" + commandString + "==>" + username + "@" + targetAddr
+      document.getElementById("cmd_sent").innerHTML = "(" + currentTime() + ")" + commandString
       // Clear status bar response field
       document.getElementById("cmd_success").innerHTML = "Waiting.."
       // Fetch the response. Catch any errors and log to the javascript console
@@ -73,11 +98,13 @@
         }).catch(error => console.log(error));
 
     }
+
     // Create timed auto-polling of the ssh commands that will populate the statusFields
     // defined in statusFields
     function registerPollers() {
       // Note: This method will be auto rendered when the page is created
       // and the tag below will be detected by the renderer
+      // **DO NOT REMOVE THE NEXT LINE**
       // ##INSERT_POLLERS
 
     }

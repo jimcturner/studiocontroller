@@ -19,6 +19,8 @@ import getopt
 from random import randint
 
 import validator_collection
+from paramiko.client import SSHClient, AutoAddPolicy
+from paramiko.ssh_exception import SSHException
 from validator_collection import validators, checkers, errors
 import textwrap
 from terminaltables import AsciiTable
@@ -33,15 +35,98 @@ class Shutdown(Exception):
 
 # Provides a means of controlling a Mikroktik router by passing in commands via ssh
 class SSHController(object):
+
+    # Creates an SSH connection
+    # By default, password is None. This means that SSHClient.connect() will attempt to log in to the remote
+    # server using a key found in ~/.ssh.
+    # If a password is specified, look_for_keys will autopmatically be set to False (otherwise the keys found
+    # in the system would override the password, rendering it unused)
+    def createClient(self, look_for_keys=True, autoAddHostToKnownHosts=True):
+        try:
+            # Create an ssh client object
+            self.sshClient= SSHClient()
+            # Set the policy to be used if this host has not been seen before
+            if autoAddHostToKnownHosts:
+                self.sshClient.set_missing_host_key_policy(AutoAddPolicy)
+
+            # If a password has been specified, inhibit the use of any local keys
+            if self.password is not None:
+                look_for_keys=False
+
+            # Create the connection
+            self.sshClient.connect(self.deviceIpAddress, port=self.tcpPort,
+                               username=self.username, password=self.password, timeout=self.connTimeout,
+                               look_for_keys=look_for_keys)
+        except Exception as e:
+            raise Exception(f"SSHController.createClient() {e}")
+
+
+    def endClient(self):
+        try:
+            self.sshClient.close()
+        except Exception as e:
+            raise Exception(f"SSHController.endClient() {e}")
+
     def __init__(self, deviceIpAddress, username, password=None, tcpPort=22) -> None:
         super().__init__()
         self.deviceIpAddress = deviceIpAddress
         self.tcpPort = tcpPort
         self.username = username
         self.password = password
+        self.connTimeout = 5
+        # Mutex to allow exclusive access to the sendCommand() message
+        self.sendMutex = threading.Lock()
 
+        # Create an SSH connection
+        try:
+            self.createClient()
+        except Exception as e:
+            raise Exception(f"SSHController.__init__() {e}")
 
-    # Sends a command to a device (Mikrotik router) via SSH
+    # Sends a command string to the remote device and returns the response as a string
+    # If the SSH connection fails and autoReconnect is True, it will attempt to reconnect
+    # before sending the command once more.from
+    # If that too fails, it will raise an Exception
+    # NOTE: The sendCommand() is protected with a mutex lock (self.sendMutex)
+    # This means that
+    def sendCommand(self, commandString, sendTimeout=None, autoReconnect=True):
+        def _sendAndReceive():
+            # Send the command
+            stdin, stdout, stderr = self.sshClient.exec_command(commandString, timeout=self.connTimeout)
+            # Return the output as a string
+            return stdout.read()
+        try:
+            # Wait for the sendMutex is free
+            if self.sendMutex.acquire(timeout=sendTimeout):
+                # acquire() returned True - the locak has been acquired, proceed
+                pass
+            else:
+                # acquire() returned False, so the timeout must have been reached. Raise an Exception
+                raise Exception("Timeout reached")
+            # Send the command/return the response
+            return _sendAndReceive()
+
+        except SSHException:
+            # If the connection fails (this could be because the connection timed out)
+            # In which case, try to re-establish the connection
+            if autoReconnect:
+                try:
+                    # Recreate the connection to the client
+                    self.createClient()
+                    # Send the command/return the response
+                    return _sendAndReceive()
+                except Exception as e:
+                    raise Exception(f"SSHController.sendCommand() Failed after retry attempt {e}")
+
+        # Trap all other exceptions
+        except Exception as e:
+            raise Exception(f"SSHController.sendCommand() {e}")
+
+        finally:
+            # Release the mutex
+            self.sendMutex.release()
+
+    # Sends a command to a device (Mikrotik router) via SSH using the built-in OS SSH command
     # Optionally, if it receives a response back from the device, it will call the callback method specified in onSuccess
     # with the router response and time in the form on (response)
 
@@ -55,7 +140,7 @@ class SSHController(object):
     # sendCommand(':put "$[/system clock get time], $[/system clock get date]";/tool traceroute address=8.8.8.8 count=1')
     # Note: Because the Mikrotik command itself contains double quotes, single quotes were used ot wrap the string passed
     # to sendCommand()
-    def sendCommand(self, commandString, timeout=5, onSuccess=None, onFailure=None):
+    def sendCommandViaOS(self, commandString, timeout=5, onSuccess=None, onFailure=None):
         try:
             # Create the command string that would be written on the command line
             # NOTE: commandString is enclosed in single quotes
@@ -286,8 +371,10 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             getMappings = {}
             self.addEndpoint(getMappings, "", self.renderIndexPage, contentType='text/html')
             self.addEndpoint(getMappings, "api", self.renderApiIndexPage, contentType='text/html')
+            # self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
+            #                  requiredKeys=["deviceAddress", "username", "commandString"])
             self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
-                             requiredKeys=["deviceAddress", "username", "commandString"])
+                             requiredKeys=["commandString"])
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
         except Exception as e:
@@ -351,6 +438,10 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # be ignored.
             # Returns a list of strings, each of which is a line of valid javascript registering an
             # autotimed Javascript function call
+            # NOTE: A random startup interval (setTimeout()) is added to the call to  setInterval() in an attempt to
+            # spread out any automated calls to the Mikrotik (via SSH). This is because the SSH send command
+            # SSHController.sendCommand() method can only service a single request at a time (it's internally protected
+            # with a mutex, and will block)
             def renderPollertJS():
                 try:
                     pollersJS = []
@@ -358,18 +449,11 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                         # Check to see if this field is to be registered as one that will auto-refresh
                         if field["target_cmd_string"] is not None and field["polling_interval_ms"] is not None:
                             # This is an auto-refreshing field
-                            # pollersJS.append(f"\nwindow.setInterval(sendCmd, " \
-                            #     f"{field['polling_interval_ms']}, " \
-                            #     f"'{controllerDefinitions['deviceAddress']}', " \
-                            #     f"'{controllerDefinitions['deviceSshUsername']}', " \
-                            #     f"'{field['target_cmd_string']}', " \
-                            #     f"'{field['id']}');")
-                            pollersJS.append(f"\nwindow.setTimeout(window.setInterval(sendCmd, " \
+                            pollersJS.append(f"\nwindow.setTimeout(window.setInterval(sendCmdToMikrotik, " \
                                              f"{field['polling_interval_ms']}, " \
-                                             f"'{controllerDefinitions['deviceAddress']}', " \
-                                             f"'{controllerDefinitions['deviceSshUsername']}', " \
                                              f"'{field['target_cmd_string']}', " \
-                                             f"'{field['id']}'), {randint(0, 5000)});")
+                                             f"'{field['id']}'), {randint(0, 3000)});")
+
 
                     # Return the list of javascript strings (one for each of the (not-being-ignored) status fields)
                     return pollersJS
@@ -410,8 +494,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                         # Convert Python 'None' to Javascript 'undefined'
                         response_field_id = f"'{button['response_field_id']}'" \
                             if button['response_field_id'] is not None else "undefined"
-                        buttonsJS.append(f"<button onclick=\"sendCmd('{controllerDefinitions['deviceAddress']}', "
-                                         f"'{controllerDefinitions['deviceSshUsername']}', "
+                        buttonsJS.append(f"<button onclick=\"sendCmdToMikrotik("
                                          f"'{button['target_cmd_string']}', "
                                          f"{response_field_id})\">"
                                          f"{button['label']}"
@@ -430,7 +513,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}, {type(e)}")
 
-    def sendCommandViaSSH(self, deviceAddress, username, commandString):
+    def sendCommandViaSSHOld(self, deviceAddress, username, commandString):
         try:
             # Create a device
             rtr = SSHController(deviceAddress, username)
@@ -439,6 +522,18 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # return f"Device response of type {type(response)}: {response.decode('utf-8')}"
             return response.decode('utf-8')
 
+
+        except Exception as e:
+            raise Exception(f"sendCommandViaSSHOld() {e}")
+
+    def sendCommandViaSSH(self, commandString):
+        try:
+            # Access parent object via server attribute
+            parent = self.server.parentObject
+            # Get a handle on the Mkrotik SSS connection
+            mikrotikSSHClient = parent.externalResourcesDict["mikrotikSSHClient"]
+            # Send the command
+            return mikrotikSSHClient.sendCommand(commandString, sendTimeout=1).decode('utf-8')
         except Exception as e:
             raise Exception(f"sendCommandViaSSH() {e}")
 
@@ -950,23 +1045,6 @@ generate a template file that can be edited
     signal.signal(signal.SIGINT, sigintHandler)  # Ctrl-C (keyboard interrupt)
     signal.signal(signal.SIGTERM, sigtermHandler)  # KILL
 
-    # # Attempt to import an external data file from within the pyz zipped archive
-    # Or, if that fails, just get the file from the file system in the usual way
-    # fileToImport = "index.html"
-    # try:
-    #     print(f"Importing {fileToImport}")
-    #     print(f"Extracted file: {retrieveFileFromArchive(sys.argv[0], fileToImport)}")
-    #
-    # except Exception as e:
-    #     pass
-    #     print(f"couldn't extract {fileToImport} from {sys.argv[0]}, {type(e)}:{e}, trying to import as a normal file")
-    #     try:
-    #         f = importFile(fileToImport)
-    #         print(f"Normal import:{f}, {type(f)}")
-    #     except Exception as e2:
-    #         pass
-    #         print(f"couldn't import {fileToImport} from {sys.argv[0]}, {type(e)}:{e2}")
-
     print("studiocontroller starting....")
     logToFile("studiocontroller starting....")
 
@@ -985,16 +1063,44 @@ generate a template file that can be edited
     except Exception as e:
         logToFile("Failed to start public HTTP Server")
 
+    # Create an ssh connection to the Mikrotik router
+    try:
+        mikrotikSSHClient = SSHController(configAsDict["mikrotikAddress"],
+                                          configAsDict["mikrotikSshUsername"],
+                                          configAsDict["mikrotikSshPassword"]
+                                          )
+        logToFile(f"Created SSH Connection to Mikrotik at "
+                  f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
+        # Add the ssh connection to the shared objects
+        sharedObjects["mikrotikSSHClient"] = mikrotikSSHClient
+    except Exception as e:
+        logToFile(f"Failed to create SSH connection to Mikrotik "
+                  f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
 
     # Provides a clean shutdown of all threads
     def shutdown():
         try:
+            # Default exitCode (assuming that the app exits cleanly)
+            exitCode = 0
             # Stop the HTTP server
             try:
-                logToFile("Stopping HTTP server")
+                logToFile(f"Stopping HTTP server on {httpServerAddr[0]}:{httpServerAddr[1]}")
                 httpServer.stopServing()
             except Exception as e:
-                raise Exception(f"ERR: Failed to stop privateHTTP {e}")
+                logToFile(f"ERR: Failed to stop privateHTTP {e}")
+                exitCode = 1
+            # Close the SSH connection to the Mikrotik
+            try:
+                logToFile(f"Closing SSH connection to Mikrotik at "
+                          f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
+                mikrotikSSHClient.endClient()
+            except Exception as e:
+                logToFile(f"ERR: Failed to close SSH to Mikrotik {e}")
+                exitCode = 1
+
+            logToFile(f"studiocontroller exited with exit code: {exitCode}")
+            exit(exitCode)
+
         except Exception as e:
             logToFile(f"shutdown() {e}")
 
@@ -1021,8 +1127,7 @@ generate a template file that can be edited
             break
     try:
         shutdown()
-        logToFile("studiocontroller exited successfully")
-        exit(0)
+
     except Exception as e:
         logToFile(f"ERR: Shutdown error {e}")
         exit(1)

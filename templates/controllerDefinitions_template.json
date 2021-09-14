@@ -19,8 +19,10 @@
 # Comment lines (those that start with a hash) will be ignored
 #
 #  The outer keys are:
-# "deviceSshUsername": The ssh username that will be used to log into the Mikrotik router
-# "deviceAddress": The ip address of the Mikrotik router
+# "mikrotikAddress": The ip address of the Mikrotik router
+# "mikrotikSshUsername": The ssh username that will be used to log into the Mikrotik router
+# "mikrotikSshPassword": (optional) The password for the account specified in mikrotikSshUsername. If this is null,
+#                         studiocontroller will attempt to log in using ssh keys instead (specified in ~/.ssh)
 # "buttonScriptMappings": A dictionary of keys: values that define a button on the web page, and what the button does
 # "statusFieldMappings": A dictionary of keys: values that define a status field on the web page, and where the field
 #                          gets its data from
@@ -63,12 +65,13 @@
 #                 "label": "Current Router Clock",
 #                 "target_cmd_string": ":put \"$[/system clock get time]\"",
 #                 "id": "uTik_timeOfDay",
-#                 "polling_interval_ms": 5000
+#                 "polling_interval_ms": 1000
 #             },
 
 {
-        "deviceAddress": "192.168.3.2",
-        "deviceSshUsername": "kabulctrl",
+        "mikrotikAddress": "192.168.3.2",
+        "mikrotikSshUsername": "kabulctrl",
+        "mikrotikSshPassword": null,
         "buttonScriptMappings": [
             {
                 "label": "Route via 4G",
@@ -96,7 +99,13 @@
                 "label": "Current Routing status",
                 "target_cmd_string": "system script run get_current_routing",
                 "id": "uTik_current_route",
-                "polling_interval_ms": 5000
-            }
+                "polling_interval_ms": 1000
+            },
+            {
+                 "label": "Current Router Clock",
+                 "target_cmd_string": ":put \"$[/system clock get time]\"",
+                 "id": "uTik_timeOfDay",
+                 "polling_interval_ms": 1000
+             }
         ]
 }
