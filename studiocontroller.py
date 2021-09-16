@@ -378,6 +378,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                              requiredKeys=["commandString"])
             self.addEndpoint(getMappings, "api/mikrotik/scripts/get", self.getMikrotikScripts)
             self.addEndpoint(getMappings, "api/mikrotik/scripts/run", self.runMikrotikScript, requiredKeys=["scriptName"])
+            self.addEndpoint(getMappings, "api/mikrotik/variables/get", self.readMikrotikGlobalVariables,
+                             optionalKeys=["varName"])
 
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
@@ -575,6 +577,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"getMikrotikScripts() {e}")
 
+    # Invokes MikrotikController.executeScript() to execute a named script on the Mikrotik
     def runMikrotikScript(self, scriptName):
         try:
             # Access Mikrotik API via server parent attribute
@@ -582,6 +585,17 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             return mikrotikAPI.executeScript(scriptName)
         except Exception as e:
             raise Exception(f"runMikrotikScript() {e}")
+
+    # Invokes MikrotikController.readGlobalVariable() to retrieve all (or, optionally a specific) global variable
+    # from Mikrotik system/scripts/environment
+    def readMikrotikGlobalVariables(self, **kwargs):
+        try:
+            # Access Mikrotik API via server parent attribute
+            mikrotikAPI = self.server.parentObject.externalResourcesDict["mikrotikAPI"]
+            return mikrotikAPI.readGlobalVariable(**kwargs)
+        except Exception as e:
+            raise Exception(f"readMikrotikGlobalVariables() {e}")
+
 
 # Provides an wrapper for the routeros_api library to allow connection to a Mikrotik router via the API
 class MikrotikController(object):
