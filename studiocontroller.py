@@ -396,6 +396,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # Sample POST endpoints inherited from isptest code. Left here by way of an example
             # self.addEndpoint(postMappings, "log", self.addMessageToLog, requiredKeys=["message"], optionalKeys=["logToDisk"])
             # self.addEndpoint(postMappings, "alert", self.alertUser, requiredKeys=["title", "body"])
+            self.addEndpoint(postMappings, "api/mikrotik/variables/set", self.setMikrotikGlobalVariable,
+                             requiredKeys=["varName", "value"])
             return postMappings
         except Exception as e:
             raise Exception(f"apiPOSTEndpoints() {e}")
