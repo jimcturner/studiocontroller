@@ -108,18 +108,6 @@
       // Clear status bar response field
       document.getElementById("cmd_success").innerHTML = "Waiting.."
       // Fetch the response. Catch any errors and log to the javascript console
-      // fetch(url).then(detectErrors).then(response => response.text())
-      //   .then(function(data) {
-      //     // Update the target destFieldID (only if specified, otherwise write to the javascript console)
-      //     if (destFieldID == undefined){
-      //         console.log("Request: " + url + ", Response: " + data)
-      //     }
-      //     else {
-      //       document.getElementById(destFieldID).innerHTML = data;
-      //     }
-      //     // Update the status bar
-      //     document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
-      //   }).catch(error => console.log(error));
       fetch(url).then(detectErrors).then(response => response.text())
         .then(function(data) {
           // Update the target destFieldID (only if specified, otherwise write to the javascript console)
@@ -152,9 +140,9 @@
             document.getElementById(destFieldID).innerHTML = JSON.parse(data)[varName];
           }
           // Update the status bar
-          document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
+          document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") API OK";
         }).catch(function(error) {
-          document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") FAIL";
+          document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") API FAIL";
           console.log(error); // Update the status bar
         });
 

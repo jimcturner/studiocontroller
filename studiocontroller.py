@@ -906,6 +906,15 @@ def get_ip(ipAddrToTest = '10.255.255.255'):
         s.close()
     return IP
 
+# Attempts to validate the contents of an imported json config file by calling the methods that make use of the
+# keys within (using the consumers of the config file as a test)
+### Not implemented yet
+def validateConfigFile():
+    try:
+        pass
+    except Exception as e:
+        raise Exception(f"validateConfigFile() {e}")
+
 def main():
     # Specify the version number of this script
     thisVersion = "1.0"
@@ -947,65 +956,6 @@ def main():
 
     # Create a dict of shared object to be shared between all the threads
     sharedObjects = {}
-
-    # Predefine some sample button/(GPI) and Mikrotik script definitions definitions
-    #
-    # buttonScriptMappings contains a list of buttons, their corresponding ssh command strings and the id of the field
-    # that will be populated with the response of that command
-    # "label": The label that will be diaplayed on the html button
-    # "target_cmd_string": The command string that will be sent to the device (via SSH)
-    # "response_field_id": Optional javascript html dom ID where the result/output of the command will be displayed
-    #
-    # statusFieldMappings contains a list of labelled status fields that will be populated automatically by running the
-    # ssh command string contained in target_cmd_string. Polling will occur at a period set by polling_interval_ms
-    # If "target_cmd_string" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
-    # to auto poll (but these field id's will still have been created so can be modified on the page)"
-    # sharedObjects["controllerDefinitions"] = {
-    #     "deviceAddress": "192.168.3.2",
-    #     "deviceSshUsername": "kabulctrl",
-    #     "buttonScriptMappings": [
-    #         {
-    #             "label": "Route via 4G",
-    #             "target_cmd_string": "system script run route_via_4g",
-    #             "response_field_id": None
-    #         },
-    #         {
-    #             "label": "Route via adhoc WiFi",
-    #             "target_cmd_string": "system script run route_via_adhoc_wifi",
-    #             "response_field_id": None
-    #         },
-    #         {
-    #             "label": "Route via adhoc cabled connection",
-    #             "target_cmd_string": "system script run route_via_adhoc_cable",
-    #             "response_field_id": None
-    #         },
-    #         {
-    #             "label": "Get Router Identity",
-    #             "target_cmd_string": "system script run get_identity",
-    #             "response_field_id": "cmd_response"
-    #         }
-    #     ],
-    #     "statusFieldMappings": [
-    #         # {
-    #         #     "label": "Current cmd status",
-    #         #     "target_cmd_string": None,
-    #         #     "id": "cmd_response",
-    #         #     "polling_interval_ms": None
-    #         # },
-    #         # {
-    #         #     "label": "Current Router Clock",
-    #         #     "target_cmd_string": ':put "$[/system clock get time]"',
-    #         #     "id": "uTik_timeOfDay",
-    #         #     "polling_interval_ms": 5000
-    #         # },
-    #         {
-    #             "label": "Current Routing status",
-    #             "target_cmd_string": 'system script run get_current_routing',
-    #             "id": "uTik_current_route",
-    #             "polling_interval_ms": 5000
-    #         }
-    #     ]
-    # }
 
     #### Pre-render some tables that can be displayed in the help-text
     #### The first and second columns of the help tables are also used to seed getopt in order to parse the

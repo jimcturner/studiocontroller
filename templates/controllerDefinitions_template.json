@@ -91,11 +91,6 @@
                 "label": "Route via adhoc cabled connection",
                 "target_script": "route_via_adhoc_cable",
                 "response_field_id": null
-            },
-            {
-                "label": "Get Router Identity",
-                "target_script": "get_identity",
-                "response_field_id": "cmd_response"
             }
         ],
         "statusFieldMappings": [
@@ -104,12 +99,6 @@
                 "mikrotik_global_variable_name": "currentRoute",
                 "id": "uTik_current_route",
                 "polling_interval_ms": 1000
-            },
-            {
-                 "label": "Current Router Clock",
-                 "mikrotik_global_variable_name": "currentTime",
-                 "id": "uTik_timeOfDay",
-                 "polling_interval_ms": 1000
-             }
+            }
         ]
 }
