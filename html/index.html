@@ -133,7 +133,7 @@ function fetchMikrotikGlobalVariable(varName, destFieldID){
       }
       else {
         // Update the field on the page, with fetched value
-        document.getElementById(destFieldID).innerHTML = data;
+        document.getElementById(destFieldID).innerHTML = JSON.parse(data)[varName];
       }
       // Update the status bar
       document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
