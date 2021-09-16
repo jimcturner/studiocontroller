@@ -18,9 +18,8 @@ import zipfile
 import getopt
 from random import randint
 
+import routeros_api
 import validator_collection
-from paramiko.client import SSHClient, AutoAddPolicy
-from paramiko.ssh_exception import SSHException
 from validator_collection import validators, checkers, errors
 import textwrap
 from terminaltables import AsciiTable
@@ -36,36 +35,36 @@ class Shutdown(Exception):
 # Provides a means of controlling a Mikroktik router by passing in commands via ssh
 class SSHController(object):
 
-    # Creates an SSH connection
-    # By default, password is None. This means that SSHClient.connect() will attempt to log in to the remote
-    # server using a key found in ~/.ssh.
-    # If a password is specified, look_for_keys will autopmatically be set to False (otherwise the keys found
-    # in the system would override the password, rendering it unused)
-    def createClient(self, look_for_keys=True, autoAddHostToKnownHosts=True):
-        try:
-            # Create an ssh client object
-            self.sshClient= SSHClient()
-            # Set the policy to be used if this host has not been seen before
-            if autoAddHostToKnownHosts:
-                self.sshClient.set_missing_host_key_policy(AutoAddPolicy)
-
-            # If a password has been specified, inhibit the use of any local keys
-            if self.password is not None:
-                look_for_keys=False
-
-            # Create the connection
-            self.sshClient.connect(self.deviceIpAddress, port=self.tcpPort,
-                               username=self.username, password=self.password, timeout=self.connTimeout,
-                               look_for_keys=look_for_keys)
-        except Exception as e:
-            raise Exception(f"SSHController.createClient() {e}")
-
-
-    def endClient(self):
-        try:
-            self.sshClient.close()
-        except Exception as e:
-            raise Exception(f"SSHController.endClient() {e}")
+    # # Creates an SSH connection
+    # # By default, password is None. This means that SSHClient.connect() will attempt to log in to the remote
+    # # server using a key found in ~/.ssh.
+    # # If a password is specified, look_for_keys will autopmatically be set to False (otherwise the keys found
+    # # in the system would override the password, rendering it unused)
+    # def createClient(self, look_for_keys=True, autoAddHostToKnownHosts=True):
+    #     try:
+    #         # Create an ssh client object
+    #         self.sshClient= SSHClient()
+    #         # Set the policy to be used if this host has not been seen before
+    #         if autoAddHostToKnownHosts:
+    #             self.sshClient.set_missing_host_key_policy(AutoAddPolicy)
+    #
+    #         # If a password has been specified, inhibit the use of any local keys
+    #         if self.password is not None:
+    #             look_for_keys=False
+    #
+    #         # Create the connection
+    #         self.sshClient.connect(self.deviceIpAddress, port=self.tcpPort,
+    #                            username=self.username, password=self.password, timeout=self.connTimeout,
+    #                            look_for_keys=look_for_keys)
+    #     except Exception as e:
+    #         raise Exception(f"SSHController.createClient() {e}")
+    #
+    #
+    # def endClient(self):
+    #     try:
+    #         self.sshClient.close()
+    #     except Exception as e:
+    #         raise Exception(f"SSHController.endClient() {e}")
 
     def __init__(self, deviceIpAddress, username, password=None, tcpPort=22) -> None:
         super().__init__()
@@ -74,57 +73,57 @@ class SSHController(object):
         self.username = username
         self.password = password
         self.connTimeout = 5
-        # Mutex to allow exclusive access to the sendCommand() message
-        self.sendMutex = threading.Lock()
+        # # Mutex to allow exclusive access to the sendCommand() message
+        # self.sendMutex = threading.Lock()
+        #
+        # # Create an SSH connection
+        # try:
+        #     self.createClient()
+        # except Exception as e:
+        #     raise Exception(f"SSHController.__init__() {e}")
 
-        # Create an SSH connection
-        try:
-            self.createClient()
-        except Exception as e:
-            raise Exception(f"SSHController.__init__() {e}")
-
-    # Sends a command string to the remote device and returns the response as a string
-    # If the SSH connection fails and autoReconnect is True, it will attempt to reconnect
-    # before sending the command once more.from
-    # If that too fails, it will raise an Exception
-    # NOTE: The sendCommand() is protected with a mutex lock (self.sendMutex)
-    # This means that
-    def sendCommand(self, commandString, sendTimeout=None, autoReconnect=True):
-        def _sendAndReceive():
-            # Send the command
-            stdin, stdout, stderr = self.sshClient.exec_command(commandString, timeout=self.connTimeout)
-            # Return the output as a string
-            return stdout.read()
-        try:
-            # Wait for the sendMutex is free
-            if self.sendMutex.acquire(timeout=sendTimeout):
-                # acquire() returned True - the locak has been acquired, proceed
-                pass
-            else:
-                # acquire() returned False, so the timeout must have been reached. Raise an Exception
-                raise Exception("Timeout reached")
-            # Send the command/return the response
-            return _sendAndReceive()
-
-        except SSHException:
-            # If the connection fails (this could be because the connection timed out)
-            # In which case, try to re-establish the connection
-            if autoReconnect:
-                try:
-                    # Recreate the connection to the client
-                    self.createClient()
-                    # Send the command/return the response
-                    return _sendAndReceive()
-                except Exception as e:
-                    raise Exception(f"SSHController.sendCommand() Failed after retry attempt {e}")
-
-        # Trap all other exceptions
-        except Exception as e:
-            raise Exception(f"SSHController.sendCommand() {e}")
-
-        finally:
-            # Release the mutex
-            self.sendMutex.release()
+    # # Sends a command string to the remote device and returns the response as a string
+    # # If the SSH connection fails and autoReconnect is True, it will attempt to reconnect
+    # # before sending the command once more.from
+    # # If that too fails, it will raise an Exception
+    # # NOTE: The sendCommand() is protected with a mutex lock (self.sendMutex)
+    # # This means that
+    # def sendCommand(self, commandString, sendTimeout=None, autoReconnect=True):
+    #     def _sendAndReceive():
+    #         # Send the command
+    #         stdin, stdout, stderr = self.sshClient.exec_command(commandString, timeout=self.connTimeout)
+    #         # Return the output as a string
+    #         return stdout.read()
+    #     try:
+    #         # Wait for the sendMutex is free
+    #         if self.sendMutex.acquire(timeout=sendTimeout):
+    #             # acquire() returned True - the locak has been acquired, proceed
+    #             pass
+    #         else:
+    #             # acquire() returned False, so the timeout must have been reached. Raise an Exception
+    #             raise Exception("Timeout reached")
+    #         # Send the command/return the response
+    #         return _sendAndReceive()
+    #
+    #     except SSHException:
+    #         # If the connection fails (this could be because the connection timed out)
+    #         # In which case, try to re-establish the connection
+    #         if autoReconnect:
+    #             try:
+    #                 # Recreate the connection to the client
+    #                 self.createClient()
+    #                 # Send the command/return the response
+    #                 return _sendAndReceive()
+    #             except Exception as e:
+    #                 raise Exception(f"SSHController.sendCommand() Failed after retry attempt {e}")
+    #
+    #     # Trap all other exceptions
+    #     except Exception as e:
+    #         raise Exception(f"SSHController.sendCommand() {e}")
+    #
+    #     finally:
+    #         # Release the mutex
+    #         self.sendMutex.release()
 
     # Sends a command to a device (Mikrotik router) via SSH using the built-in OS SSH command
     # Optionally, if it receives a response back from the device, it will call the callback method specified in onSuccess
@@ -515,19 +514,6 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"renderIndexPage() {parent.__class__.__name__}({self.client_address}), {e}, {type(e)}")
 
-    def sendCommandViaSSHOld(self, deviceAddress, username, commandString):
-        try:
-            # Create a device
-            rtr = SSHController(deviceAddress, username)
-            # Send the commandString to the device
-            response = rtr.sendCommand(commandString)
-            # return f"Device response of type {type(response)}: {response.decode('utf-8')}"
-            return response.decode('utf-8')
-
-
-        except Exception as e:
-            raise Exception(f"sendCommandViaSSHOld() {e}")
-
     def sendCommandViaSSH(self, commandString):
         try:
             # Access parent object via server attribute
@@ -535,7 +521,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # Get a handle on the Mkrotik SSS connection
             mikrotikSSHClient = parent.externalResourcesDict["mikrotikSSHClient"]
             # Send the command
-            return mikrotikSSHClient.sendCommand(commandString, sendTimeout=1).decode('utf-8')
+            return mikrotikSSHClient.sendCommandViaOS(commandString).decode('utf-8')
         except Exception as e:
             raise Exception(f"sendCommandViaSSH() {e}")
 
@@ -576,6 +562,88 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             return htmlWrapped
         except Exception as e:
             raise Exception(f"browseFileSystem() {e}")
+
+# Provides an wrapper for the routeros_api library to allow connection to a Mikrotik router via the API
+class MikrotikController(object):
+    # Defines the connection parameters for a Mikrotik
+    def __init__(self, ipAddress, username, password='', tcpPort=8728, plaintext_login=True, connectionTimeout=3):
+        try:
+            self.ipAddress = ipAddress
+            self.tcpPort = tcpPort
+            self.username = username
+            # If None is supplied as a password, set it to '' (otherwise the API conenction will fail)
+            self.password = password if password is not None else ''
+            self.connectionTimeout = connectionTimeout
+            self.usePlaintext_login = plaintext_login
+
+            # Define a Mikrotik device
+            self.connection = routeros_api.RouterOsApiPool(self.ipAddress, username=self.username, port=self.tcpPort,
+                                                           password=self.password, plaintext_login=plaintext_login)
+            # Set socket timeout
+            self.connection.set_timeout(self.connectionTimeout)
+            # Connect to the API
+            self.api = self.connection.get_api()
+        except Exception as e:
+            raise Exception(f"MikrotikController.__init__() {e}")
+
+    # # Connects to, and returns an instance of itself (to provide one-line access to the getter/setter methods)
+    # def connectToApi(self):
+    #     try:
+    #
+    #         return self
+    #     except Exception as e:
+    #         raise Exception(f"MikrotikController.connectToApi() {e}")
+
+    # Disconnect the connection to the Mikrotik
+    def disconnect(self):
+        try:
+            self.connection.disconnect()
+        except Exception as e:
+            raise Exception(f"MikrotikController.disconnect() {e}")
+
+    # Returns the value of all environment (global) variables (as a dicts)
+    # If varName is set, returns just that var (as a single element dict)
+    def readGlobalVariable(self, varName=None):
+        try:
+            # return self.api.get_resource('/system/script/environment').get()
+            # If varName is set, return just that var key and value
+            # Get the vars as a list
+            vars = list(self.api.get_resource('/system/script/environment').get(name=varName)) if varName is not None \
+                else list(self.api.get_resource('/system/script/environment').get())
+            # The API returns the environmant key/values pairs as a list of dicts
+            # Simplify this to be a simple dict
+            return {var['name']: var['value']for var in vars}
+
+        except Exception as e:
+            raise Exception(f"MikrotikController.readGlobalVariable() {e}")
+
+    # Modifies a global variable. Note, if this variable doesn't exist yet, this will throw an Exception
+    def setGlobalVariable(self, varName, value):
+        try:
+            self.api.get_resource('/system/script/environment').set(id=varName, value=str(value))
+        except Exception as e:
+            raise Exception(f"MikrotikController.setGlobalVariable() {e}")
+
+    def executeScript(self, scriptName):
+        try:
+            self.api.get_resource('/system/script').call('run', arguments={'number': scriptName})
+        except Exception as e:
+            raise Exception(f"MikrotikController.executeScript() {e}")
+
+    # Returns a nested dict of scripts keyed by the script name
+    # The value is a sict of keys {runCount, lastTimeStarted, sourceCode}
+    def getScripts(self):
+        try:
+            # Get a list of scripts
+            scriptsList = list(self.api.get_resource('/system/script').get())
+            # Convert the list into a dict of dicts, keyed by the script name
+            return { script['name']: {'run-count': script['run-count'],
+                                      'owner': script['owner'],
+                                      'last-started': script['last-started'] if 'last-started' in script else None,
+                                      'source': script['source']} for script in scriptsList}
+
+        except Exception as e:
+            raise Exception(f"MikrotikController.listScripts() {e}")
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
@@ -1065,19 +1133,34 @@ generate a template file that can be edited
     except Exception as e:
         logToFile("Failed to start public HTTP Server")
 
-    # Create an ssh connection to the Mikrotik router
+    # Create an ssh connection to the Mikrotik router (this wonlt actually connect, just allow commands to be sent
+    # via the /api/sshcmd through the SSHController.sendCommandViaOS() method
     try:
         mikrotikSSHClient = SSHController(configAsDict["mikrotikAddress"],
-                                          configAsDict["mikrotikSshUsername"],
-                                          configAsDict["mikrotikSshPassword"]
+                                          configAsDict["mikrotikUsername"],
+                                          configAsDict["mikrotikPassword"]
                                           )
         logToFile(f"Created SSH Connection to Mikrotik at "
-                  f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
+                  f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
         # Add the ssh connection to the shared objects
         sharedObjects["mikrotikSSHClient"] = mikrotikSSHClient
     except Exception as e:
         logToFile(f"Failed to create SSH connection to Mikrotik "
-                  f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
+                  f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+
+    # Create a connection to the Mikrotik API
+    try:
+        mikrotikAPI = MikrotikController(configAsDict["mikrotikAddress"],
+                                          configAsDict["mikrotikUsername"],
+                                          configAsDict["mikrotikPassword"]
+                                          )
+        logToFile(f"Created Connection to Mikrotik API at "
+              f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+        # Add the ssh connection to the shared objects
+        sharedObjects["mikrotikAPI"] = mikrotikAPI
+    except Exception as e:
+        logToFile(f"Failed to create API connection to Mikrotik at "
+                  f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
 
     # Provides a clean shutdown of all threads
     def shutdown():
@@ -1091,13 +1174,23 @@ generate a template file that can be edited
             except Exception as e:
                 logToFile(f"ERR: Failed to stop privateHTTP {e}")
                 exitCode = 1
-            # Close the SSH connection to the Mikrotik
+
+            # # Close the SSH connection to the Mikrotik
+            # try:
+            #     logToFile(f"Closing SSH connection to Mikrotik at "
+            #               f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+            #     mikrotikSSHClient.endClient()
+            # except Exception as e:
+            #     logToFile(f"ERR: Failed to close SSH to Mikrotik {e}")
+            #     exitCode = 1
+
+            # Close the connection to the Mikrotik API
             try:
-                logToFile(f"Closing SSH connection to Mikrotik at "
-                          f"{configAsDict['mikrotikSshUsername']}@{configAsDict['mikrotikAddress']}")
-                mikrotikSSHClient.endClient()
+                logToFile(f"Closing API connection to Mikrotik at "
+                          f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+                mikrotikAPI.disconnect()
             except Exception as e:
-                logToFile(f"ERR: Failed to close SSH to Mikrotik {e}")
+                logToFile(f"ERR: Failed to close API connection to Mikrotik {e}")
                 exitCode = 1
 
             logToFile(f"studiocontroller exited with exit code: {exitCode}")

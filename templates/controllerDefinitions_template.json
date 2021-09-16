@@ -20,90 +20,94 @@
 #
 #  The outer keys are:
 # "mikrotikAddress": The ip address of the Mikrotik router
-# "mikrotikSshUsername": The ssh username that will be used to log into the Mikrotik router
-# "mikrotikSshPassword": (optional) The password for the account specified in mikrotikSshUsername. If this is null,
+# "mikrotikApiPort": The TCP port used by the Mikrotik API (default: 8728)
+# "mikrotikUsername": The username that will be used to log into the Mikrotik router (API)
+# "mikrotikPassword": (optional) The password for the account specified in mikrotikSshUsername. If this is null,
 #                         studiocontroller will attempt to log in using ssh keys instead (specified in ~/.ssh)
+#                     Note: If not used, set to ""
 # "buttonScriptMappings": A dictionary of keys: values that define a button on the web page, and what the button does
 # "statusFieldMappings": A dictionary of keys: values that define a status field on the web page, and where the field
-#                          gets its data from
+#                          gets its data from (i.e which Mikrotik global variable)
 #
 # buttonScriptMappings
 # --------------------
 # A list of buttons, their corresponding ssh command strings and the id of the field
 # that will be populated with the response of that command
 # "label": The label that will be displayed on the html button
-# "target_cmd_string": The command string that will be sent to the device (via SSH)
+# "target_script": The command string that will be sent to the device (via SSH)
 # "response_field_id": Optional javascript html dom ID where the result/output of the command will be displayed
 #                       This maps directly to the "id" field in the statusFieldMappings definitions
 #
 # statusFieldMappings
 # -------------------
 # A list of labelled status fields that can be populated automatically by the output of the
-# ssh command string contained in target_cmd_string. Polling will occur at a period set by polling_interval_ms
-# If "target_cmd_string" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
+# ssh command string contained in target_script. Polling will occur at a period set by polling_interval_ms
+# If "target_script" and polling_interval_ms are initialised as None, they will be ignored and *wont* be set
 # to auto poll (but these field id's will still have been created so can be modified on the page)"
 # "label" The text that will be displayed beside the field
-# "target_cmd_string" (optional) The command string that will automatically be sent to the device (via SSH) at a period
-#                       specified in "polling_interval_ms". Note: If this key is not to be used, (i.e if this field will
-#                       just be used to diaplay the output from a command triggered by a button, use the value null)
+# "mikrotik_global_variable_name" (optional) The name of the global variable within the Mikrotik that will
+#                       automatically be retrieved and displayed at a period specified in "polling_interval_ms".
+#                       Note: If this is set to null, the field will be created on the page but not auto-populated.
 #
 #
 # "id" A unique label used by html/javascript to uniquely identify the field within the web page
-#       The device response to the command string in "target_cmd_string" will be displayed in this field
-# "polling_interval_ms" The period in (in mS) that the command string defined in "target_cmd_string" will be sent
-#                       This permits the automatic retrieval of a value at a preset interval. If "target_cmd_string" is
-#                        not used (i.e null) this should also be set to null
+#       The device response to the command string in "target_script" will be displayed in this field
+# "polling_interval_ms" The period in (in mS) that the Mikrotik global variable name defined in
+#                        "mikrotik_global_variable_name" will be retrieved.
+#                       This permits the automatic retrieval of a value at a preset interval.
+#                       If "polling_interval_ms" is not used (i.e null) this should also be set to null
 
 # Example statusFieldMappings definitions
 # {
 #               "label": "Current cmd status",
-#                 "target_cmd_string": null,
+#                 "target_script": null,
 #                 "id": "cmd_response",
 #                 "polling_interval_ms": null
 #             },
 #             {
 #                 "label": "Current Router Clock",
-#                 "target_cmd_string": ":put \"$[/system clock get time]\"",
+#                 "target_script": ":put \"$[/system clock get time]\"",
 #                 "id": "uTik_timeOfDay",
 #                 "polling_interval_ms": 1000
 #             },
 
 {
-        "mikrotikAddress": "192.168.3.2",
-        "mikrotikSshUsername": "kabulctrl",
-        "mikrotikSshPassword": null,
+        "mikrotikAddress": "192.168.88.1",
+        "mikrotikApiPort": 8728,
+        "mikrotikUsername": "kabul",
+        "mikrotikPassword": null,
         "buttonScriptMappings": [
             {
                 "label": "Route via 4G",
-                "target_cmd_string": "system script run route_via_4g",
+                "target_script": "route_via_4g",
                 "response_field_id": null
             },
             {
                 "label": "Route via adhoc WiFi",
-                "target_cmd_string": "system script run route_via_adhoc_wifi",
+                "target_script": "route_via_adhoc_wifi",
                 "response_field_id": null
             },
             {
                 "label": "Route via adhoc cabled connection",
-                "target_cmd_string": "system script run route_via_adhoc_cable",
+                "target_script": "route_via_adhoc_cable",
                 "response_field_id": null
             },
             {
                 "label": "Get Router Identity",
-                "target_cmd_string": "system script run get_identity",
+                "target_script": "get_identity",
                 "response_field_id": "cmd_response"
             }
         ],
         "statusFieldMappings": [
             {
                 "label": "Current Routing status",
-                "target_cmd_string": "system script run get_current_routing",
+                "mikrotik_global_variable_name": "currentRoute",
                 "id": "uTik_current_route",
                 "polling_interval_ms": 1000
             },
             {
                  "label": "Current Router Clock",
-                 "target_cmd_string": ":put \"$[/system clock get time]\"",
+                 "mikrotik_global_variable_name": "currentTime",
                  "id": "uTik_timeOfDay",
                  "polling_interval_ms": 1000
              }
