@@ -376,7 +376,9 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             #                  requiredKeys=["deviceAddress", "username", "commandString"])
             self.addEndpoint(getMappings, "api/mikrotik/sendcmdviassh", self.sendCommandViaSSH, contentType='text/html',
                              requiredKeys=["commandString"])
-            self.addEndpoint(getMappings, "api/mikrotik/getscripts", self.getMikrotikScripts)
+            self.addEndpoint(getMappings, "api/mikrotik/scripts/get", self.getMikrotikScripts)
+            self.addEndpoint(getMappings, "api/mikrotik/scripts/run", self.runMikrotikScript, requiredKeys=["scriptName"])
+
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
         except Exception as e:
@@ -564,14 +566,22 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"browseFileSystem() {e}")
 
-    # Retreives the scripts stored on the Mikrotik
+    # Retreives the scripts stored on the Mikrotik via MikrotikController.getScripts()
     def getMikrotikScripts(self):
         try:
-            # Access parent object via server attribute
+            # Access Mikrotik API via server parent attribute
             mikrotikAPI = self.server.parentObject.externalResourcesDict["mikrotikAPI"]
             return mikrotikAPI.getScripts()
         except Exception as e:
             raise Exception(f"getMikrotikScripts() {e}")
+
+    def runMikrotikScript(self, scriptName):
+        try:
+            # Access Mikrotik API via server parent attribute
+            mikrotikAPI = self.server.parentObject.externalResourcesDict["mikrotikAPI"]
+            return mikrotikAPI.executeScript(scriptName)
+        except Exception as e:
+            raise Exception(f"runMikrotikScript() {e}")
 
 # Provides an wrapper for the routeros_api library to allow connection to a Mikrotik router via the API
 class MikrotikController(object):
@@ -637,6 +647,7 @@ class MikrotikController(object):
     def executeScript(self, scriptName):
         try:
             self.api.get_resource('/system/script').call('run', arguments={'number': scriptName})
+            return True
         except Exception as e:
             raise Exception(f"MikrotikController.executeScript() {e}")
 
