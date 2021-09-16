@@ -376,7 +376,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             #                  requiredKeys=["deviceAddress", "username", "commandString"])
             self.addEndpoint(getMappings, "api/mikrotik/sendcmdviassh", self.sendCommandViaSSH, contentType='text/html',
                              requiredKeys=["commandString"])
-            self.addEndpoint(getMappings, "api/mikrotik/getscripts", self.sendCommandViaSSH)
+            self.addEndpoint(getMappings, "api/mikrotik/getscripts", self.getMikrotikScripts)
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
         except Exception as e:
