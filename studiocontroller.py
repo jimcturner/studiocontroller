@@ -380,6 +380,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             self.addEndpoint(getMappings, "api/mikrotik/scripts/run", self.runMikrotikScript, requiredKeys=["scriptName"])
             self.addEndpoint(getMappings, "api/mikrotik/variables/get", self.readMikrotikGlobalVariables,
                              optionalKeys=["varName"])
+            self.addEndpoint(getMappings, "api/mikrotik/variables/set", self.setMikrotikGlobalVariable,
+                             requiredKeys=["varName", "value"])
 
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
@@ -596,6 +598,16 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
         except Exception as e:
             raise Exception(f"readMikrotikGlobalVariables() {e}")
 
+    # Invokes MikrotikController.setGlobalVariable() to set the value of a named global variable
+    # If the global variable doesn't exist, this will thrown an Exception
+    def setMikrotikGlobalVariable(self, varName, value):
+        try:
+            # Access Mikrotik API via server parent attribute
+            mikrotikAPI = self.server.parentObject.externalResourcesDict["mikrotikAPI"]
+            return mikrotikAPI.setGlobalVariable(varName, value)
+        except Exception as e:
+            raise Exception(f"setMikrotikGlobalVariable() {e}")
+
 
 # Provides an wrapper for the routeros_api library to allow connection to a Mikrotik router via the API
 class MikrotikController(object):
@@ -655,6 +667,7 @@ class MikrotikController(object):
     def setGlobalVariable(self, varName, value):
         try:
             self.api.get_resource('/system/script/environment').set(id=varName, value=str(value))
+            return True
         except Exception as e:
             raise Exception(f"MikrotikController.setGlobalVariable() {e}")
 
