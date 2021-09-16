@@ -912,6 +912,16 @@ def main():
     # Specify the defaault HTTP Server listen port
     httpServerDefaultPort = 10000
 
+    # Mikrotik API connection check period.
+    mikrotikAPIConnectionCheckPeriod_s = 5
+
+    # No of Mikrotik reconnection attempts before studiocontroller gives up
+    # Set to None to attempt indefinitely
+    mikrotikAPIReconnectionAttempts = None
+
+    # Time between API reconnection attempts
+    mikrotikAPIReconnectWaitTime_s = 2
+
     #### Check for minimum python version
     if (testPythonVersion(3, 8)):
         # Python version check passed
@@ -1241,6 +1251,7 @@ generate a template file that can be edited
     except Exception as e:
         logToFile(f"Failed to create API connection to Mikrotik at "
                   f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+        mikrotikAPI = None
 
     # Provides a clean shutdown of all threads
     def shutdown():
@@ -1254,15 +1265,6 @@ generate a template file that can be edited
             except Exception as e:
                 logToFile(f"ERR: Failed to stop privateHTTP {e}")
                 exitCode = 1
-
-            # # Close the SSH connection to the Mikrotik
-            # try:
-            #     logToFile(f"Closing SSH connection to Mikrotik at "
-            #               f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
-            #     mikrotikSSHClient.endClient()
-            # except Exception as e:
-            #     logToFile(f"ERR: Failed to close SSH to Mikrotik {e}")
-            #     exitCode = 1
 
             # Close the connection to the Mikrotik API
             try:
@@ -1280,20 +1282,67 @@ generate a template file that can be edited
             logToFile(f"shutdown() {e}")
 
     # # Endless loop - until a shutdown Exception is raised or some other error occurs
-    # try:
-    #     rtr = SSHController("192.168.3.2", "kabulctrl")
-    # except Exception as e:
-    #     raise Exception(f"Create SSH Controller {e}")
-    #     exit(1)
-    #
-    # def routerCallback(response=None, timestamp=None, exception=None):
-    #     print(f"routerCallback() {timestamp}: {response}, exception: {exception}")
-
+    loopcounter = 0
+    # Set to False, if the API becomes disconnected and can't be reconnected after mikrotikAPIReconnectionAttempts attempts
+    attemptReconnectionFlag = True
     while True:
         try:
-            # print(".")
-            # rtr.sendCommand(':put "$[/system clock get time]"', callbackMethod=routerCallback)
-            time.sleep(2)
+            # Every x seconds, test that the Mikrotik API is still available (by making a request)
+            # If it fails, attempt to reconnect
+            if loopcounter %  mikrotikAPIConnectionCheckPeriod_s == 0 and attemptReconnectionFlag and mikrotikAPI is not None:
+                try:
+                    # Retrieve the global vars from the router.
+                    mikrotikAPI.readGlobalVariable()
+                except Exception as e:
+                    mikrotikAPI = None
+                    logToFile(f"Failed Mikrotik API connection check. Attempting reconnection to "
+                              f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+
+                    try:
+                        # If mikrotikAPIReconnectionAttempts is None, treat that as 'unlimited attempts'
+                        attemptsRemaining = mikrotikAPIReconnectionAttempts if \
+                            mikrotikAPIReconnectionAttempts is not None else 0
+
+                        while attemptsRemaining > 0 or mikrotikAPIReconnectionAttempts == None:
+                            try:
+                                mikrotikAPI = MikrotikController(configAsDict["mikrotikAddress"],
+                                                                 configAsDict["mikrotikUsername"],
+                                                                 configAsDict["mikrotikPassword"]
+                                                                 )
+                                logToFile(f"Recreated Connection to Mikrotik API at "
+                                          f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']}")
+                                # Add the api connection to the shared objects
+                                sharedObjects["mikrotikAPI"] = mikrotikAPI
+                                # Success - Break out of the reconnect loop
+                                break
+                            except Exception as e:
+                                # Decrement the attemptsRemaining counter
+                                attemptsRemaining -= 1
+
+                                if mikrotikAPIReconnectionAttempts is not None:
+                                    logToFile(f"Mikrotik API reconnection to "
+                                              f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']} "
+                                              f"Failed. {attemptsRemaining} attempts remaining. {e}")
+                                    if attemptsRemaining < 1:
+                                        # If we've run out of attempts, inhibit any more
+                                        attemptReconnectionFlag = False
+                                        logToFile(f"Abandoning Mikrotik API reconnection to "
+                                              f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']} ")
+                                else:
+                                    logToFile(f"Mikrotik API reconnection to "
+                                        f"{configAsDict['mikrotikUsername']}@{configAsDict['mikrotikAddress']} "
+                                        f"Failed. {attemptsRemaining}. Continuing indefinitely {e}")
+                                # Wait before retrying
+                                time.sleep(mikrotikAPIReconnectWaitTime_s)
+                    except Exception as e:
+                        logToFile(f"main() Reconnect Mikrotik API connection: {e}")
+
+
+
+
+            # Increment the loopcounter
+            loopcounter += 1
+            time.sleep(1)
         except Shutdown as e:
             logToFile(f"shutting down {e}")
             break

@@ -601,7 +601,7 @@ class HTTPRequestHandlerRTP(BaseHTTPRequestHandler):
                     # Attempt to import the index.html page
                     # path = "html/index.html"
                     archiveName = parent.externalResourcesDict['pyzArchiveName']
-                    self.log_error(f"Attempt to load: {path} from {archiveName}")
+                    # self.log_error(f"Attempt to load: {path} from {archiveName}")
                     try:
                         response = HTTPTools.retrieveFileFromArchive(parent.externalResourcesDict["pyzArchiveName"], path)
                     except Exception as e:
