@@ -1,0 +1,2 @@
+netmiko==3.4.0
+packaging==20.9
