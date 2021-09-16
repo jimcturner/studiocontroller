@@ -374,8 +374,9 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             self.addEndpoint(getMappings, "api", self.renderApiIndexPage, contentType='text/html')
             # self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
             #                  requiredKeys=["deviceAddress", "username", "commandString"])
-            self.addEndpoint(getMappings, "api/sshcmd", self.sendCommandViaSSH, contentType='text/html',
+            self.addEndpoint(getMappings, "api/mikrotik/sendcmdviassh", self.sendCommandViaSSH, contentType='text/html',
                              requiredKeys=["commandString"])
+            self.addEndpoint(getMappings, "api/mikrotik/getscripts", self.sendCommandViaSSH)
             self.addEndpoint(getMappings, "debug/browsefiles", self.browseFileSystem, contentType='text/html')
             return getMappings
         except Exception as e:
@@ -435,7 +436,7 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             # Dynamically render the registerPollers() code for all status fields defined in controllerDefinitions["statusFieldMappings"]
 
             # Iterates over controllerDefinitions['statusFieldMappings'] creating a line of javascript for each
-            # field listed. If the "polling_interval_ms" or "target_cmd_string" keys are None, the field will
+            # field listed. If the "polling_interval_ms" or "mikrotik_global_variable_name" keys are None, the field will
             # be ignored.
             # Returns a list of strings, each of which is a line of valid javascript registering an
             # autotimed Javascript function call
@@ -448,11 +449,11 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                     pollersJS = []
                     for field in controllerDefinitions['statusFieldMappings']:
                         # Check to see if this field is to be registered as one that will auto-refresh
-                        if field["target_cmd_string"] is not None and field["polling_interval_ms"] is not None:
+                        if field["mikrotik_global_variable_name"] is not None and field["polling_interval_ms"] is not None:
                             # This is an auto-refreshing field
                             pollersJS.append(f"\nwindow.setTimeout(window.setInterval(sendCmdToMikrotik, " \
                                              f"{field['polling_interval_ms']}, " \
-                                             f"'{field['target_cmd_string']}', " \
+                                             f"'{field['mikrotik_global_variable_name']}', " \
                                              f"'{field['id']}'), {randint(0, 3000)});")
 
 
@@ -562,6 +563,15 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
             return htmlWrapped
         except Exception as e:
             raise Exception(f"browseFileSystem() {e}")
+
+    # Retreives the scripts stored on the Mikrotik
+    def getMikrotikScripts(self):
+        try:
+            # Access parent object via server attribute
+            mikrotikAPI = self.server.parentObject.externalResourcesDict["mikrotikAPI"]
+            return mikrotikAPI.getScripts()
+        except Exception as e:
+            raise Exception(f"getMikrotikScripts() {e}")
 
 # Provides an wrapper for the routeros_api library to allow connection to a Mikrotik router via the API
 class MikrotikController(object):
@@ -1115,11 +1125,10 @@ generate a template file that can be edited
     signal.signal(signal.SIGINT, sigintHandler)  # Ctrl-C (keyboard interrupt)
     signal.signal(signal.SIGTERM, sigtermHandler)  # KILL
 
-    print("studiocontroller starting....")
     logToFile("studiocontroller starting....")
 
     # Start a web server
-    print(f"start web server using: {httpServerAddr}")
+    logToFile(f"start web server using: {httpServerAddr}")
     try:
         # Create a web server
         httpServer = HttpServerCreator(httpServerAddr[1], PublicHTTPRequestHandler,
