@@ -44,6 +44,7 @@
       return new Date().toLocaleTimeString([], {
         hour: '2-digit',
         minute: "2-digit",
+        second: "2-digit",
         hour12: false
       })
 
@@ -99,6 +100,46 @@
 
     }
 
+// Executes a named script on the Mikrotik router
+function runMikrotikScript(scriptName){
+  // Construct the (relative) URL query where the data will be fetched from
+  let url = 'api/mikrotik/scripts/run?scriptName=' + scriptName
+  // Fetch the response. Catch any errors and log to the javascript console
+  fetch(url).then(detectErrors).then(response => response.text())
+    .then(function(data) {
+      // Update the target destFieldID (only if specified, otherwise write to the javascript console)
+      if (destFieldID == undefined){
+          console.log("Request: " + url + ", Response: " + data)
+      }
+      else {
+        document.getElementById(destFieldID).innerHTML = data;
+      }
+      // Update the status bar
+      document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
+    }).catch(error => console.log(error));
+
+}
+
+// Retrieves the value of a Mikrotik value and updates the destFieldID on the page
+function fetchMikrotikGlobalVariable(varName, destFieldID){
+  // Construct the (relative) URL query where the data will be fetched from
+  let url = 'api/mikrotik/variables/get?varName=' + varName
+  // Fetch the response. Catch any errors and log to the javascript console
+  fetch(url).then(detectErrors).then(response => response.text())
+    .then(function(data) {
+      // Update the target destFieldID (only if specified, otherwise write to the javascript console)
+      if (destFieldID == undefined){
+          console.log("Request: " + url + ", Response: " + data)
+      }
+      else {
+        // Update the field on the page, with fetched value
+        document.getElementById(destFieldID).innerHTML = data;
+      }
+      // Update the status bar
+      document.getElementById("cmd_success").innerHTML = "(" + currentTime() + ") OK";
+    }).catch(error => console.log(error));
+
+}
     // Create timed auto-polling of the ssh commands that will populate the statusFields
     // defined in statusFields
     function registerPollers() {

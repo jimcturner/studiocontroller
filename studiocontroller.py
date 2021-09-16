@@ -459,7 +459,8 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                         # Check to see if this field is to be registered as one that will auto-refresh
                         if field["mikrotik_global_variable_name"] is not None and field["polling_interval_ms"] is not None:
                             # This is an auto-refreshing field
-                            pollersJS.append(f"\nwindow.setTimeout(window.setInterval(sendCmdToMikrotik, " \
+                            # Calls the fetchMikrotikGlobalVariable() javascript method
+                            pollersJS.append(f"\nwindow.setTimeout(window.setInterval(fetchMikrotikGlobalVariable, " \
                                              f"{field['polling_interval_ms']}, " \
                                              f"'{field['mikrotik_global_variable_name']}', " \
                                              f"'{field['id']}'), {randint(0, 3000)});")
@@ -504,9 +505,9 @@ class PublicHTTPRequestHandler(HTTPRequestHandlerRTP):
                         # Convert Python 'None' to Javascript 'undefined'
                         response_field_id = f"'{button['response_field_id']}'" \
                             if button['response_field_id'] is not None else "undefined"
-                        buttonsJS.append(f"<button onclick=\"sendCmdToMikrotik("
-                                         f"'{button['target_cmd_string']}', "
-                                         f"{response_field_id})\">"
+                        # Invokes the runMikrotikScript() javascript method
+                        buttonsJS.append(f"<button onclick=\"runMikrotikScript("
+                                         f"'{button['target_script']}')\">"
                                          f"{button['label']}"
                                          f"</button>")
                     return buttonsJS
@@ -623,6 +624,8 @@ class MikrotikController(object):
             self.password = password if password is not None else ''
             self.connectionTimeout = connectionTimeout
             self.usePlaintext_login = plaintext_login
+            # Create a mutex to restrict access to the API to only serve one request at a time
+            self.apiAccessMutex = threading.Lock()
 
             # Define a Mikrotik device
             self.connection = routeros_api.RouterOsApiPool(self.ipAddress, username=self.username, port=self.tcpPort,
@@ -655,45 +658,73 @@ class MikrotikController(object):
         try:
             # return self.api.get_resource('/system/script/environment').get()
             # If varName is set, return just that var key and value
-            # Get the vars as a list
-            vars = list(self.api.get_resource('/system/script/environment').get(name=varName)) if varName is not None \
-                else list(self.api.get_resource('/system/script/environment').get())
-            # The API returns the environmant key/values pairs as a list of dicts
-            # Simplify this to be a simple dict
-            return {var['name']: var['value']for var in vars}
+
+            # Acquire the mutext lock
+            if self.apiAccessMutex.acquire(timeout=self.connectionTimeout):
+                # Get the vars as a list
+                vars = list(self.api.get_resource('/system/script/environment').get(name=varName)) if varName is not None \
+                    else list(self.api.get_resource('/system/script/environment').get())
+                # The API returns the environmant key/values pairs as a list of dicts
+                # Simplify this to be a simple dict
+                return {var['name']: var['value']for var in vars}
+            else:
+                raise Exception("request timed out")
 
         except Exception as e:
             raise Exception(f"MikrotikController.readGlobalVariable() {e}")
+        finally:
+            # *Always* release the mutex
+            self.apiAccessMutex.release()
 
     # Modifies a global variable. Note, if this variable doesn't exist yet, this will throw an Exception
     def setGlobalVariable(self, varName, value):
         try:
-            self.api.get_resource('/system/script/environment').set(id=varName, value=str(value))
-            return True
+            # Acquire the mutext lock
+            if self.apiAccessMutex.acquire(timeout=self.connectionTimeout):
+                self.api.get_resource('/system/script/environment').set(id=varName, value=str(value))
+                return True
+            else:
+                raise Exception("request timed out")
         except Exception as e:
             raise Exception(f"MikrotikController.setGlobalVariable() {e}")
+        finally:
+            # *Always* release the mutex
+            self.apiAccessMutex.release()
 
     def executeScript(self, scriptName):
         try:
-            self.api.get_resource('/system/script').call('run', arguments={'number': scriptName})
-            return True
+            # Acquire the mutex lock
+            if self.apiAccessMutex.acquire(timeout=self.connectionTimeout):
+                self.api.get_resource('/system/script').call('run', arguments={'number': scriptName})
+                return True
+            else:
+                raise Exception("request timed out")
         except Exception as e:
             raise Exception(f"MikrotikController.executeScript() {e}")
+        finally:
+            # *Always* release the mutex
+            self.apiAccessMutex.release()
 
     # Returns a nested dict of scripts keyed by the script name
     # The value is a sict of keys {runCount, lastTimeStarted, sourceCode}
     def getScripts(self):
         try:
-            # Get a list of scripts
-            scriptsList = list(self.api.get_resource('/system/script').get())
-            # Convert the list into a dict of dicts, keyed by the script name
-            return { script['name']: {'run-count': script['run-count'],
-                                      'owner': script['owner'],
-                                      'last-started': script['last-started'] if 'last-started' in script else None,
-                                      'source': script['source']} for script in scriptsList}
-
+            # Acquire the mutex lock
+            if self.apiAccessMutex.acquire(timeout=self.connectionTimeout):
+                # Get a list of scripts
+                scriptsList = list(self.api.get_resource('/system/script').get())
+                # Convert the list into a dict of dicts, keyed by the script name
+                return { script['name']: {'run-count': script['run-count'],
+                                          'owner': script['owner'],
+                                          'last-started': script['last-started'] if 'last-started' in script else None,
+                                          'source': script['source']} for script in scriptsList}
+            else:
+                raise Exception("request timed out")
         except Exception as e:
             raise Exception(f"MikrotikController.listScripts() {e}")
+        finally:
+            # *Always* release the mutex
+            self.apiAccessMutex.release()
 
 # Tests the current Python interpreter version
 def testPythonVersion(majorVersionNo, minorVersionNumber):
